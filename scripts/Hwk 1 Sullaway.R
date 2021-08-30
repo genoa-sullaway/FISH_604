@@ -144,7 +144,6 @@ E.Eggs = E.Eggs1 + E.Eggs2
 # = p1^2 * E(N1*f1) + p2^2 * E(N2*f2)
 
 #breaking down the above formula ^^
-
 varN1=sd.N1^2 #sd.N1^2 *E.N1^2 
 varf1=sd.f1^2 #sd.f1^2*E.f1^2
 E.N1f1= E.f1^2*varN1+ E.N1^2*varf1+ varN1*varf1
