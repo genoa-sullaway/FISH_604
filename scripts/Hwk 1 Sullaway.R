@@ -21,22 +21,25 @@ table(f.dat$Lake)    # Number of observations by lake
 ### (a) Plot histograms and boxplots
 
 #---- Enter your code below and briefly annotate as needed ----
-#plot histrogram of fecundity
+#plot histogram of fecundity
 hist(f.dat$Fecundity) 
 #Fecundity looks like it is normally distributed, with a slight right skew. 
 
-#plot histogram, group fecundity by lake. Looks like a slight difference in fecundity distributions by lake, Lake 2 looks like it has higher fecundity. 
+#plot histogram, group fecundity by lake. 
+#Looks like a slight difference in fecundity distributions by lake, 
+#Lake 2 looks like it has higher fecundity. 
 hist.lake<-ggplot(f.dat, aes(x=Fecundity, color=Lake)) +
   geom_histogram(fill="white") +
   theme_classic()
 print(hist.lake)
 
-#plot boxplot of data - again we see slight right skew with some outliers around 6000. 
+#plot boxplot of data
+#again we see slight right skew, with some outliers around 6000. 
 ggplot(f.dat, aes(y=Fecundity)) +
   geom_boxplot(fill="white") +
   theme_classic()
 
-#similarly it is a little more apparent that there is a higher median fecundity in Lake 2. 
+# Lake 2 has a greater median fecundity than lake 1, both lakes have a slight right skew. 
 ggplot(f.dat, aes(x=Lake, y=Fecundity, color=Lake)) +
   geom_boxplot(fill="white") +
   theme_classic() +
@@ -51,14 +54,17 @@ ggplot(f.dat, aes(x=Lake, y=Fecundity, color=Lake)) +
 ### (b) Compute mean fecundities (expected values) and their standard errors:
 
 #---- Enter your code below and briefly annotate as needed ----
-
 f.dat.sum<-f.dat %>%
   group_by(Lake) %>%
-  summarise(mean_fecundity = mean(Fecundity), sd.Fecundity= sd(Fecundity), n=length(Fecundity), 
-            se=sd.Fecundity/sqrt(n))
+  summarise(mean_fecundity = mean(Fecundity),
+            se=sd(Fecundity)/sqrt(length(Fecundity)))
 
-print(f.dat.sum)
+#Fecundity mean and SE for each lake. 
+print(f.dat.sum) 
 #--------------------------------------------------------------
+
+
+
 
 
 ### (c) Compare means 
@@ -69,10 +75,11 @@ print(f.dat.sum)
 #---- Enter your code below and briefly annotate as needed ----
 t.test(f.dat$Fecundity~f.dat$Lake, var.equal=FALSE)
 
-#Results: Mean fecundity for sockeye salmon in lake 2 (Mean = 3958.024, SE= 46.1) is greater than fecundity for sockeye in 
-#Lake 1 (Mean = 3389, SE= 44.2) (p<0.05). 
-
-#I think separate estimates of fecundity and variance should be reported results should be reported because mean fecundity varies by lake additionally the samples are independent, pooling the results across lake would cover up inherent variability in the sockeye population.
+#Results: 
+  #Mean fecundity for sockeye salmon in lake 2 (Mean = 3958.024, SE= 46.1) is greater than fecundity for sockeye in 
+  #Lake 1 (Mean = 3389, SE= 44.2) (p<0.05). 
+  #I think separate estimates of fecundity and variance should be reported because mean fecundity varies by lake.
+  #Additionally the samples are independent, pooling the results across lake would cover up inherent variability in the sockeye population.
  
 #--------------------------------------------------------------
 
@@ -93,11 +100,6 @@ E.N2 <- 73608
 s.N1 <- 23245
 s.N2 <- 10120
 
-#convert standard errors to sd
-#sd = sqrt(SE^2 * N)
-sd.N1 <-sqrt(s.N1^2 * 265)
-sd.N2 <- sqrt(s.N2^2 * 254)
-
 # Expected mean fecundity
 E.f1= 3389
 E.f2= 3958
@@ -106,20 +108,17 @@ E.f2= 3958
 s.f1 = 44.2
 s.f2 = 46.1
 
-#std_deviation of fecundity 
-sd.f1=720
-sd.f2=734
 
-#Var = SE^2 * N
-#need to convert standard error to std dev or variance 
+
 
 ### (a) Expected number of eggs (in millions):
-# Note that pi is a constant, and Ni and fi are independent
+# pi is a constant, and Ni and fi are independent
 
 #---- Enter your code below and briefly annotate as needed ----
-#E(Eggs)=E(E1+E2)=E(p1 N1 f1 + p2 N2 f2)
+#E(Eggs)=E(E1+E2)=E(p1*N1*f1 + p2*N2*f2)
+
 E.Eggs1=p1*E.N1*E.f1 
-E.Eggs2=p2*E.N2*E.f2
+E.Eggs2=p2*E.N2*E.f2 #Lake 2 has higher mean fecundity but lower number of expected spawners and % female. 
 E.Eggs = E.Eggs1 + E.Eggs2
 
 # We expect 395 million eggs across both lakes (395,941,544). 
@@ -127,41 +126,46 @@ E.Eggs = E.Eggs1 + E.Eggs2
 
 
 
+
+
+
 ###  (b) Variance:
 
-#---- Enter your code below and briefly annotate as needed ----
-# I feel like there are two ways to do this... the way franz wrote it out where Var(X+Y) = Var(X) + Var(Y) or the formula
-        # var(E1 + E2) = var(E1) + var(E2) =E(X^2) -E.fi = ((E.Eggs1^2) -E.fi1) + ((E.Eggs2^2) -E.fi2)
+#---- Enter your code below and briefly annotate as needed -------------------------------
+# where Var(X+Y) = Var(X)+Var(Y)+2Cov(X,Y) <--- *** this = 0 if variables are uncorrelated. 
 
-# where Var(X+Y) = Var(X)+Var(Y)+2Cov(X,Y) <--- *** this = 0 if variables are uncorrelated. So OG formula is the same! aha. 
-# E.var.eggs=(E.Eggs1 -E.f1)^2 + (E.Eggs2 -E.f2)^2
-# sqrt(E.var.eggs)
-
-#ORRR THIS WAY: ---- check later to make sure everything is inputted correctly - very hard to keep track
 # var(E1 + E2) 
 # = var(E1) + var(E2)
-# = var(E(p1*N1*f1) + (p2 N2*f2)) # p = constant, f and E = random variables
-# = p1^2 * E(N1*f1) + p2^2 * E(N2*f2)
+# = var(E(p1*N1*f1) + (p2*N2*f2)) # p = constant, f and N = random variables
+# = p1^2 * var(E(N1*f1)) + p2^2 * var(E(N2*f2))
 
-#breaking down the above formula ^^
+# To fill in the above equation, we know that p is a constant and:
+    #var(E(N1*f1)) = mean(f1)^2*var(N1) + mean(N1)^2*var(f1) + var(N1)*var(f1)
+    #var(E(N2*f2)) = mean(f2)^2*var(N2) + mean(N2)^2*var(f2) + var(N2)*var(f2)
 
-varN1=sd.N1^2 #sd.N1^2 *E.N1^2 
-varf1=sd.f1^2 #sd.f1^2*E.f1^2
-E.N1f1= E.f1^2*varN1+ E.N1^2*varf1+ varN1*varf1
+#break down the above formula ^^
+#get variances to plug into the formulas
+varN1=s.N1^2 
+varf1=s.f1^2 
 
-varN2= sd.N2^2 #s.N2^2 *E.N2^2
-varf2= sd.f2^2 #s.f2^2*E.f2^2
-E.N2f2 = E.f2*varN2+E.N2*varf2+varN2*varf2
+varE.N1f1= (E.f1^2*varN1) + (E.N1^2*varf1)+ (varN1*varf1)
 
-E.var.eggs = p1^2 * E.N1f1 + p2^2 * E.N2f2
+#do the same for the second lake
+varN2= s.N2^2 
+varf2= s.f2^2 
+varE.N2f2 = (E.f2^2*varN2)+(E.N2^2*varf2)+(varN2*varf2)
 
-#I still get really big numbers!! ?!?!
- 
-
+#plug all into final equation for var(E1+E2)
+E.var.eggs = (p1^2 * varE.N1f1) + (p2^2 * varE.N2f2)
+#Expected variance # var(E1 + E2) for both  lakes is:
+      print(E.var.eggs)
 #--------------------------------------------------------------
 
 
 
+
+      
+      
 ### (c) 95% confidence interval, assuming normal distribution:
 
 #---- Enter your code below and briefly annotate as needed ----
@@ -169,7 +173,7 @@ E.var.eggs = p1^2 * E.N1f1 + p2^2 * E.N2f2
 
 # 95% Confidence Interval for total catch assuming normal distribution:
 
-cat(round(E.Eggs - 1.96*sd.C), "to",  round(E.Eggs + 1.96*sd.C), "Sockeye Eggs")
+cat("95% of the time the mean will be between",round(E.Eggs - 1.96*sqrt(E.var.eggs))/1000000, "to",  round(E.Eggs + 1.96*sqrt(E.var.eggs))/1000000, "Million Sockeye Eggs")
 
 #--------------------------------------------------------------
 
@@ -177,9 +181,14 @@ cat(round(E.Eggs - 1.96*sd.C), "to",  round(E.Eggs + 1.96*sd.C), "Sockeye Eggs")
 ### Problem 3
 #3a #(a) In one sentence, define skewness (3 pts)
 #---- Enter your code below and briefly annotate as needed ----
- #Skewness is the degree to which the distribution of your data are uneven.  
+ #Skewness is the degree to which the distribution of your data are uneven as compared to a normal distribution.  
 #--------------------------------------------------------------
 
+      
+      
+      
+      
+      
 #3b Based on the definition in (a) or examining the formula for skewness, what is the expected skewness (average across many samples) of a sample from a normally distributed population? (Justify your answer). 
 #You may also want to check your answer by repeatedly generating large random samples from a normal distribution (use 'rnorm()') and computing their skewness
 #(use, for example, function 'skewness()' in package 'moments'). (3 pts).
@@ -188,7 +197,7 @@ cat(round(E.Eggs - 1.96*sd.C), "to",  round(E.Eggs + 1.96*sd.C), "Sockeye Eggs")
 # The skewness of a normal distribution should be 0 because the cubed sum of individual observations from the mean will be zero or very close to 0.
 
 #check 
-N.sim <- rnorm(100000)
+N.sim <- rnorm(100000000)
 hist(N.sim)
 moments::skewness(N.sim)
 
@@ -222,24 +231,12 @@ print(lake.skew)
 #Does the 95% confidence interval include the expected value for a normal distribution? 
 #What can you conclude about skewness of fecundity in the two lakes? (10 pts)
 #--------------------------------------------------------------
-lake.skew <- f.dat %>%
-  group_by(Lake) %>%
-  summarise(moments::skewness(Fecundity))
 
-#there is a quicker way to do this with apply but I was getting weird answers 
-
-#f<-sapply(f.dat2, function(x) sample(x,replace = T))
-
-# for(i in 1:999) { #loop for bootstrapping
-#   f<-sapply(f.dat2, function(x) sample(x,replace = T),simplify = "array")
-#   
-#   out[i]<-sapply(f, function(x) skewness(x),simplify = "array")
-# }
 
 lake1.out <- numeric(999)  #vector for the output
 lake2.out <- numeric(999)
 for(i in 1:999) { # loop for bootstrapping
-  lake1 <- sample(f.dat2[[1]], replace=T)
+  lake1 <- sample(f.dat2[[1]], replace=T) 
   lake1.out[i] <- moments::skewness(lake1)
 
   lake2 <- sample(f.dat2[[2]], replace=T)
@@ -266,11 +263,11 @@ cat(mean(lake2.out) - 1.96*sd(lake2.out), "to",  mean(lake2.out) + 1.96*sd(lake2
 #(e) Finally, use the 'agostino.test()' (package: moments) to test for skewness. 
 #Compare conclusions to those in (d) (5 pts)
 #--------------------------------------------------------------
-agostino.test(as.numeric(L[[1]]$Fecundity))
-agostino.test(as.numeric(L[[2]]$Fecundity))
+agostino.test(as.numeric(f.dat2[[1]]))
+agostino.test(as.numeric(f.dat2[[2]]))
 print(lake.skew)
 
-#The calculations provide similiar outputs, thus using both the skewness calculation and the agostino test I can conclude that the data do have right skew. 
+#The calculations provide similar outputs, thus using both the skewness calculation and the agostino test I can conclude that the data do have right skew. 
 #--------------------------------------------------------------
 
 
