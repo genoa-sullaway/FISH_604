@@ -1,0 +1,591 @@
+---
+title: 'Linear modeling - R basics'
+author: "Franz Mueter, with thanks to Arni Magnusson"
+date: "September 7, 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+(Approximate duration: 3 hours)
+
+# Model formulas:
+There are many uses for formulas in both model fitting functions and in many graphics functions. Here, we are primarily concerned with formulae used in modeling functions such as lm, aov, glm, gls, nls, etc. These functions take a formula as their first argument, which has the general form:
+
+`response ~ expression`
+
+where 'response' typically is a response variable or some expression that returns the response variable, e.g. `log(y+1)`, and 'expression' consists of one or more terms (typically the independent variables in a regression) joined by operators like '+', '-', '*', etc. In linear and generalized linear modeling the formula specifies how the response is modeled as a function of the independent variables.
+
+See module 9 slides for more on model formulas and formula notation.
+
+# Statistical modelling in R
+
+Let's start by looking at a fairly simple data set to do some basic model explorations. This is where that regression class comes in handy that is technically a requirement of the class (!). If you need to brush up on your regression skills, I suggest Chapter 9 of Gotelli and Ellison (2004). I posted a pdf on Blackboard. 
+
+First, just run through the example code below if you opened the R Markdown file or by running the script file 'Module 9.R'. (Or enter code in the console, if you prefer)
+
+Look at the mammal data set, which contains brain and body weights for a number of mammal species:
+
+```{r MASS, results='hide'}
+library(MASS)			# attach MASS library for data and functions
+mammals           # Look at the mammal data
+```
+
+First, as always, explore data graphically, in this case there aren't a whole lot of clever things to do except looking at a simple scatterplot. It makes sense that brain size may be related to and determined by body size (rather than the other way around), hence we plot body size on the x-axis and use it as the 'explanatory' variable in modeling.
+
+```{r}
+plot(brain ~ body, data=mammals)
+```
+
+Note the curvature in the relationship and the fact that there are a couple awfully big animals that make everyone else appear tiny (Who are they? You could look at the sorted data frame to find out). Both of those observations suggest that a log-transformation may be appropriate (although that may not be obvious to you at this point).
+
+Let's try it:
+
+```{r}
+plot(log(brain) ~ log(body), data=mammals)
+```
+
+Looks pretty good! The relationship is now at least approximately linear and there is no evidence of unequal variances (that is, the vertical spread of the y-values is about the same over the range of x-values!! Seems like regression assumptions would probably be met if we fit a simple linear regression to the data.  We can write the model as folows: 
+
+> Model:   $log(brain) = a + b * log(body) + \epsilon$
+
+To fit the model, you can simply replace `plot` in the above expression with `lm`:
+```{r}
+mammals.lm <- lm(log(brain)~log(body), data=mammals)
+```
+
+The output from the model, including regression statistics, fitted values, residuals and other values are stored in the resulting object `mammals.lm` We start by extracting a basic summary of the regression results from the fitted model object. Remeber that the `summary` function checks the class of the object and then uses the `summary.lm` method to do something sensible with the contents of `mammals.lm`, in this case producing the following:
+
+```{r}
+summary(mammals.lm)
+```
+
+As we saw before, the fitted model object is a list of various components:
+```{r}
+names(mammals.lm)  	
+```
+
+We can extract individual components using the $ notation and the appropriate names (note that you don't have to type the full name, only enough to uniquely identify the component):
+
+```{r, eval=F}
+mammals.lm$call		# the code that we can type to create this model
+mammals.lm$coef		# parameter estimates (regression coefficients)
+mammals.lm$fit		# fitted values
+mammals.lm$res		# residuals
+mammals.lm$rank		# number of parameters estimated (p=model degrees of freedom)
+mammals.lm$df.res 	# residual degrees of freedom (=n-p)
+```
+
+Some of these components can instead be extracted using the corresponding generic "extractor" functions (preferred):
+```{r, eval=F}
+coef(mammals.lm) 		# same as:  mammals.lm$coef
+fitted(mammals.lm) 	# same as: mammals.lm$fitted
+residuals(mammals.lm) 	# same as: mammals.lm$resid
+# selects one of five different kinds of residuals
+resid(mammals.lm, type="pearson")		# short alias for 'residuals'
+```
+
+Similar to the fitted model object itself (`mammals.lm`), the `summary` function results in another list that contains various components. Let's explore the components of the summary object (as computed by `summary`):
+```{r}
+names(summary(mammals.lm))       # Components of the summary object
+summary(mammals.lm)$coef         # Table of 'coefficients' with std errors, etc
+```
+
+For further computations, it typically makes sense to save the output from a call to summary, then extract the components that you need:
+```{r}
+s <- summary(mammals.lm)
+s$coe	  	# parameter estimates with std. errors and t test (Hyp: coef=0)
+s$r.sq    # R-square
+s$fstat	  # F-statistic ('value') with numerator and denominator d.f.
+```
+
+To simplify the code below, we save the independent (explanatory) and dependent (response) variable as vectors 'x' and 'y', respectively: 
+```{r}
+x <- log(mammals$body)
+y <- log(mammals$brain)
+```
+
+We start by fitting the "null model", that is a model that fits an intercept only (with zero slope, i.e. a horizontal line through the data):
+
+```{r}
+fit0 <- lm(y ~ 1)
+summary(fit0)
+```
+
+The null model is simply estimating the mean (and variance or standard deviation) of the y-values:
+
+```{r}
+mean(y); sd(y)	
+```
+
+Compare the mean and standard deviation of the y-values to the intercept and the residual standard error estimated by the null model! Obviously, this is not a very sensible model as there is a clear relationship between brain size and body size, but the model is useful for comparison purposes. 
+
+A reasonable assumption may be that the relationship between brain size and body size goes through the origin (i.e.log-brain size decreases linearly with log-body size and approaches zero when body size approaches zero). We can force the line to go through the origin by removing the intercept using '-1'. This estimates a slope only, but no intercept:
+
+```{r}
+fit.slope <- lm(y ~ x - 1)
+```
+
+Plotting the results suggests a very poor fit: 
+
+```{r}
+plot(x, y, xlim=c(0,max(x)), ylim=c(0,max(y))); abline(fit.slope)
+```
+
+What does this imply about the brain-body size relationship? 
+The poor fit suggests that we should definitely include an intercept, hence we fit a simple linear regression (same as 'mammals.lm' above):
+
+```{r}
+fit1 <- lm(y ~ x)
+summary(fit1)		
+```
+
+This regression explains 92% of the variability in brain size using body size as a predictor (both on the log-scale, of course). Not bad! We can formally compare the simple liner regression to the null model using an F-test. The F-test (as well as other tests) is implemented in the 'anova' function that can be used to compare models, as well as test the overall fit of a model:
+
+```{r}
+anova(fit0, fit1) 		# Compare two model fits using F-test
+```
+
+The F-test compares the residual sum of squares (RSS) of the "bigger" model (the simple linear regression - Model 2) to the RSS of the smaller model (the null model - Model 1) and assesses whether the bigger model reduces RSS enough to justify the extra parameter or whether you could achieve the observed reduction in RSS by chance alone even if the null model is true. In this case, there is overwhelming evidence (p << 0) that the simple linear regression provides a better fit to the data (that is, we can reject the null model decisively). 
+
+We may also want to test if brain size is linearly proportional to body size or if there is evidence that brain size levels off as body size increases (on the log scale - we already saw that this is true on the 'raw' scale, hence we did a log-transformation in the first place). 
+
+If there is curvature on the log-scale, this should be evident in a significant curvature in the relationship, which we can estimate (for example) by adding a quadratic term to the model:
+
+> Quadratic model:   $y = a + b_{1} * x + b_2 * x^{2} + \epsilon$ 
+
+In R notation, we need to use the identity function 'I' - which simply returns the values for $x^{2}$ - to fit the quadratic model (otherwise, R will interpret '^' as part of the model formula, denoting 'expansion' of terms. We can fit the new model using the 'update' function, which means that R does not have to refit the entire model as it uses the old output (although the computational savings are trivial here). The output shows the full fitted model (Component 'Call').
+
+```{r}
+fit2 <- update(fit1, ~ . + I(x^2))	 
+summary(fit2)
+```
+
+What does that say about any curvature? We can look at the coefficient for the quadratic term and check if it is significantly different from zero. That's exactly what the "t-test" in the output does. It always tests whether the estimated coefficient is significantly different from zero (null hypothesis), whether that is sensible or not. In this case it means that the quadratic term is not significant, hence the simpler model is preferable.
+
+Equivalently, we can compare the simple linear regression with the quadratic regression by comparing the nested models using an F-test:
+
+```{r}
+anova(fit1, fit2)
+```
+
+Note that the p-value for comparing the simple linear and quadratic regressions is identical in this case to the p-value from the t-test for the quadratic term!  
+
+Conclusion: We cannot reject the null hypothesis that the simple linear regression is the "true" model (i.e. that the coefficient for the quadratic term is zero). Hence the data do not provide evidence of curvi-linearity in the relationship between the logarithm of body size and the logarithm of brain size!
+
+As an alternative to fitting the linear and quadratic terms as two separate terms, we can also fit the full quadratic model using poly(), which is the preferred approach:
+
+```{r}
+fit <- lm(y ~ poly(x, 2))
+```
+
+
+Essentially, `poly()` creates two new variables that are equivalent to the linear and quadratic terms but are not correlated with each other. Note that $x$ and $x^{2}$ are highly correlated with each other (r = `r cor(x, x^2)`), whereas the two new variables are not:
+```{r}
+new <- poly(x, 2)
+head(new)              # New, rotated variables
+```
+
+These are rotated versions of the original $x$ and $x^{2}$ terms (linear rotations) which are uncorrelated with each other, as you can easily see:
+
+```{r}
+cor(poly(x,2))
+```
+
+Comparing the fit with `poly` to the original quadratic fit (`fit2`), we see that the estimated coefficients are very different because the independent variables are different (different "parameterization""). However, the fitted values are identical, as evident in the plot:
+
+```{r}
+coef(fit)
+coef(fit2)
+plot(fitted(fit), fitted(fit2))
+abline(0,1) 	   # Add line with intercept 0, slope 1 (1:1 correspondence line)
+```
+
+The fits are completely identical - the only difference is that poly() uses a "better" parameterization  in which parameters are uncorrelated (no multicollinearity issues!).
+
+We can visualize the model fit using, for example, the 'termplot' function (see help file for info!). It returns a single fitted relationship for the quadratic ('poly') term that shows the estimated relationship:
+
+```{r}
+termplot(fit, se=T, partial.resid=T)
+```
+
+There is slight curvature in the estimated fit, but as we saw above it is not signifcant and a linear models should be adequate!
+
+Now let's take a closer look at humans to examine if we have an unusual brain size!
+
+```{r}
+plot(log(mammals$body), log(mammals$brain))
+abline(mammals.lm)		# Add regression line
+
+# Extract values for humans from data frame and log-transform, then highlight humans in plot: 
+human <- log(mammals["Human", ])
+human
+points(human[1], human[2], pch=16, cex=2, col = 2)
+text(human[1], human[2]+1, "me", cex=2)
+```
+
+As should be obvious from this plot, we have an unusually large brain size for our body size because the point is well above the regression line! 
+
+Often, the purpose of this kind of regression is to make predictions. In this case, we might want to predict the brain weights of other mammals that were not included in the analysis and for which we may not have any data. Let's predicts brain weight for three species weighing on average 60, 500 and 2000kg and add the predicted values to the plot. The 'predict' function works with most model functions and uses the fitted model to predict the values of the response variable (log(brain weight)) at new values of the explanatory variables. The new values are specified as a data frame with a variable name that has to match the name in the model fit ('mammals.lm'). The new data are specified on the original scale because the log-transformation is done in the model formula.
+
+```{r, eval=F}
+pred <- predict(mammals.lm, newdata=data.frame(body=c(60, 500, 2000)))
+plot(log(mammals$body), log(mammals$brain))
+abline(mammals.lm)		# Add regression line
+points(log(c(60, 500,2000)), pred, pch=16, cex=2, col=3)
+```
+
+
+The difference is much more pronounced on the back-transformed ('raw') scale! We can back-transform the predicted values, which were computed on the log scale (x), by exponentiating (i.e. the inverse of taking the log):
+
+```{r, eval=F}
+plot(mammals$body, mammals$brain)
+points(c(60,500,2000), exp(pred), pch=16, cex=3, col=3)
+```
+
+Note that this corresponds to the predicted **median** brain size at a given body size, NOT the predicted **mean** brain size. To compute mean brain size at a given body size we would need to apply a bias correction when converting from the log-scale back to the original scale (using $exp(x + s^{2}/2)$, where $s^{2}$ is the estimated residual variance).
+
+## Exercise
+Plot the fitted relationship between body size and brain size on the raw (untransformed) scale by (1) creating a vector of ordered, equally-spaced body sizes (x-values) spanning the range of observed body sizes, (2) computing predicted brain sizes for these x values on the log-scale, (3) back-transforming the predicted values to compute median or mean brain size at a given body size, and (4) adding the results as a line on a scatterplot of the data. 
+
+******** HAVING TROUBLE WITH THIS ONE... CHECK SOLUTIONS. 
+
+```{r}
+ 
+ggplot(mammals,aes(x=body, y = brain)) +
+  geom_point( ) +
+  geom_smooth(method = "lm")
+
+x_even<- log(c(seq(from = 100, to = 6000, by = 900)))
+
+mammals.lm <- lm(log(brain)~log(body), data=mammals)
+
+pred<- as.data.frame(predict(mammals.lm, newdata=data.frame(body= x_even)))
+pred$log_x <- x_even
+
+pred$log_y<- pred$`predict(mammals.lm, newdata = data.frame(body = x_even))`
+
+#pred$log_y<- pred$`exp(predict(mammals.lm, newdata = data.frame(body = x_even)))` 
+
+pred$x<-exp(pred$log_x)
+pred$y<-exp(pred$log_y)
+
+
+ggplot(mammals,aes(x=body, y = brain)) +
+  geom_point( ) +
+  geom_smooth(method = "lm") + 
+  geom_point(data = pred,aes(x=x, y = y), color = "pink")
+ 
+```
+
+## Diagnostics
+Whenever you fit a model, you should run some basic diagnostics:
+
+```{r}
+par(mfrow=c(2,2))
+plot(mammals.lm)		# Do you find any unusual patterns? Outliers?
+par(mfrow=c(1,1))
+```
+
+
+There are no obvious patterns that would be of concern in the plot and the data are close to normally distributed. 
+Quite often, we may want to know what observation a particular point in a diagnostic plot corresponds to. To identify any unusual / extreme values interactively, you can use the 'identify' function:
+
+```{r, eval=F}
+plot(mammals.lm$fit, mammals.lm$res)
+abline(h=0)
+identify(mammals.lm$fit, mammals.lm$res, row.names(mammals))
+```
+
+This puts you in interactive mode and you can click near data points to label the point with the name of the mammal (which `identify` gets from the row names). Click on one or more points and hit escape when done, which adds labels to the points! 
+
+As measured by the magnitude of the residual (i.e. the distance from the average brain size at a given body size), who is the "smartest" of them all? Who is apparently the "dumbest" mammal by this measure? 
+
+Let's remove humans and re-fit the model. To do so, we can create a logical vector that is true for all rows in `mammals` except for the row corresponding to humans. We then update the model for the subset that does not include humans:
+
+```{r}
+(j <- row.names(mammals) != "Human")
+mammals.lm2 <- update(mammals.lm, subset = j)
+```
+
+Let's compare the fitted lines and parameter estimates to the model with all data included:
+
+```{r}
+plot(log(mammals$body), log(mammals$brain))
+abline(mammals.lm)			      # Original fit	
+abline(mammals.lm2, col=2)		# Fit after removing humans
+```
+
+The two fits are barely distinguishable in the plot!
+
+```{r}
+summary(mammals.lm)$coef
+summary(mammals.lm2)$coef
+```
+
+We can compute the change in coefficients when eliminating humans from the regression. This is a diagnostic measure that quantifies the "influence" of humans on the regression:
+
+```{r}
+coef(mammals.lm) - coef(mammals.lm2)
+```
+
+The difference seems fairly small. You can easily compute the change in coefficients that results from dropping each observation in turn using the 'influence' function:
+
+```{r}
+mammals.infl <- influence(mammals.lm)
+
+# Change in coefficients after dropping humans (compare to results above!):
+mammals.infl$coeff["Human", ]
+
+# Change in coefficients for dropping any given observation (only first 5 are shown):
+head(mammals.infl$coeff)
+```
+
+
+We checked for a specific form of curvature ('quadratic') when we fit the quadratic model. Maybe the relationship is non-linear in some other way? For example, we can fit a more flexible non-parametric smooth function that is commonly used to estimate relationships between a predictor and a respons (LOWESS). The corresponding function  is `loess`, which uses the same formula structure as other modeling functions and we can use some of the same extractor functions such as `fitted` and `resid`. However, the fitted model has no model coefficients, so `coef(mammals.loess)` results in `NULL`
+
+```{r}
+mammals.loess <- loess(log(brain)~log(body), data=mammals)
+mammals.loess
+summary(mammals.loess)  # Output is quite different from a linear model!
+names(mammals.loess)    # Components of the model fit
+```
+```{r, eval = F}
+fitted(mammals.loess)	# Fitted values
+resid(mammals.loess)
+```
+
+```{r, fig.width=5, fig.height=4}
+# Plot the fitted values on log-transformed scale:
+par(mar=c(5,4,1,1))
+plot(log(mammals$body), fitted(mammals.loess), col=6)
+```
+
+```{r, fig.width=5, fig.height=4}
+# Or we can try to connect the fitted values with a line:
+par(mar=c(5,4,1,1))
+plot(log(mammals$body), fitted(mammals.loess), col=6)
+lines(log(mammals$body), fitted(mammals.loess), col=4)
+```
+
+OOPS! This creates a mess because the x-values are not sorted! We can fix the plot by sorting values before connecting them with a line:
+
+```{r, fig.width=5, fig.height=4}
+par(mar=c(5,4,1,1))
+x <- log(mammals$body)
+y <- mammals.loess$fit
+plot(log(mammals$body), log(mammals$brain))
+lines(x[order(x)], y[order(x)]) 	 # In order of increasing x!
+```
+
+
+\pagebreak
+  
+## Additional material
+
+Here are some additional (optional) examples to explore and learn some new regression tricks. 
+
+Let's explore another data set: the `cabbages` data from field experiments
+First, learn about the data and take a look at it
+
+```{r, eval=F}
+?cabbages
+names(cabbages)
+cabbages
+```
+
+Let's say we are interested in modeling the Vitamin C content to find out what cabbages we should buy to maximize our Vitamin C intake. Or, in other words, are there differences in Vitamin C content among varieties (cultivar), by planting date, or by weight.
+
+We'll start with some exploratory plots to get a feel for the data. I dind't include any of the output to keep the clutter at bay and to encourage you to explore on your own:
+
+```{r, eval = F}
+library(lattice)
+dotplot(Date ~ VitC, data=cabbages) # Distribution of Vitamin C by date
+boxplot(cabbages$VitC) # Range and distribution of all Vitamin C values 
+
+# Separate Vitamin C content by date, then plot their distribution by date:
+VitC.by.date <- split(cabbages$VitC, cabbages$Date)
+boxplot(VitC.by.date)
+
+# which is actually the same as: 
+plot(cabbages$Date, cabbages$VitC)
+
+# Perhaps Vitamin C content various with weight ("head weight"):
+plot(VitC~HeadWt, data=cabbages)
+scatter.smooth(cabbages$HeadWt, cabbages$VitC) 
+
+# The "scatter smooth" fits a LOWESS regression using loess and adds the result
+# to a scatter plot, hence is the same as:
+plot(VitC~HeadWt, data=cabbages)
+(lo <- loess.smooth(cabbages$HeadWt, cabbages$VitC)) # Save output (predicted values)
+lines(lo) # Add line to plot based on predicted values over range of x
+
+# Separate Vitamin C contents by cultivar, then plot:
+boxplot(split(cabbages$VitC, cabbages$Cult))
+
+# Plot Vitamin C as a function of weight for different levels of Cult
+coplot(VitC~HeadWt|Cult, data=cabbages)
+
+# Add scatterplot smoother (LOWESS smoother)
+coplot(VitC~HeadWt|Cult, data=cabbages, panel=panel.smooth)
+
+# Plot Vitamin C as a function of weight by date, with LOWESS smoother
+coplot(VitC~HeadWt|Date, data=cabbages, panel=panel.smooth, rows=1)
+
+# Plot by date and Cult:
+coplot(VitC~HeadWt|Date*Cult, data=cabbages) # OR, equivalently:
+coplot(VitC~HeadWt|Date+Cult, data=cabbages)
+
+# Exlore potential interactions between the two factors:
+# (Check help file: '?interaction.plot'
+attach(cabbages)
+interaction.plot(Cult, Date, VitC)
+interaction.plot(Date, Cult, VitC)
+detach(cabbages)
+
+```
+
+Now that we have explored the cabbages data, we'll fit some statistical models to estimate if and how Vitamin C content varies among varieties, by planting date, and with the weight of the cabbage. 
+
+For simplicity, we start with a two-way ANOVA, ignoring the obvious influence of cabbage weight (for now):
+
+```{r}
+cabbages.aov <- aov(VitC~Cult+Date, data=cabbages)
+summary(cabbages.aov)
+par(mfrow=c(2,2))
+plot(cabbages.aov) # Diagnostic plots
+par(mfrow=c(1,1))
+plot(cabbages$HeadWt, resid(cabbages.aov), col=as.numeric(cabbages$Date), pch=16)
+abline(h=0)
+```
+
+The results suggest highly significant differences in Vitamin C content based on planting date and among the different varieties (based on Anova table with results from F-test). While the basic residual plots do not show any evidence of problems or regression violations, the plot of residuals against cabbage weights shows a clear decreasing trend that the model does not account for.  
+
+Let's explore a simple linear regression of Vitamin C on weight (this time ignoring the effects of variety and planting date):
+
+```{r}
+cabbages.lm <- lm(VitC ~ HeadWt, data=cabbages)
+summary(cabbages.lm)
+par(mfrow=c(2,2))
+plot(cabbages.lm) # Residual diagnostics
+par(mfrow=c(1,1))
+plot(cabbages$Cult, resid(cabbages.lm)) # Residuals by cultivar
+plot(cabbages$Date, resid(cabbages.lm)) # Residuals by planting date
+```
+
+Ignoring the other factors, there is a clear (decreasing) trend in Vitamin C concentration with cabbage weight (bigger heads have lower Vitamin C concentration per unit weight, perhaps not surprising!). The residual plots suggest that the model with weight alone is inadequate as it misses obvious differences among varieties and possibly among sampling dates.
+
+Both of the above models seem inadequate, hence we fit the model that we probably should have started with, which is a "full model" that includes both factors (Cult, Date), while also accounting for the influence of head weight, as well as including an interaction term between cultivar and planting date as we saw some evidence for an interaction and it is reasonable to think that different varieties may differ in Vitamin C content when grown at different times ('early' and 'late' varieties?).
+
+The full model therefore is a two-way ANCOVA (ANOVA on Cult and Date, while adjusting for effects of Weight) with an interaction:
+
+```{r}
+cabbages.ancova <- lm(VitC~HeadWt+Cult*Date, data=cabbages)
+summary(cabbages.ancova)  # Basic linear model summary with model coefficients
+# There is no evidence that interaction term is signficant, hence we drop it:
+cabbages.ancova <- update(cabbages.ancova, . ~ . - Cult:Date)
+summary(cabbages.ancova)  # Basic linear model summary with model coefficients
+anova(cabbages.ancova)    # Anova Table of results for main factors
+par(mfrow=c(2,2))
+plot(cabbages.lm) # Residual diagnostics
+```
+
+In addition to the standard residual plot, we typically plot residuals against each of the covariates (using boxplots or scatterplots). Here's the code (without the output):
+```{r, eval=F}
+par(mfrow=c(1,1))
+plot(cabbages$Cult, resid(cabbages.ancova)); abline(h=0)  # Residuals by cultivar
+plot(cabbages$Date, resid(cabbages.ancova)); abline(h=0) # Residuals by planting date
+plot(cabbages$HeadWt, resid(cabbages.ancova)); abline(h=0) # Residuals by weight
+```
+
+Everything looks pretty good and there is no evidence that model assumptions are violated for the 'full' model (without interactions).  
+
+Let's check how much of the variability in Vitamin C content can be explained by each of the models. (This is the coefficient of determination or $R^{2}$)
+
+```{r}
+summary(cabbages.lm)$r.sq
+summary(cabbages.ancova)$r.sq
+summary(cabbages.aov)$r.sq
+```
+
+The simple linear regression explains about 44% of the variability in Vitamin C, while the full model explains about 2/3 (67%). Note that The 'aov' object that holds output from the 2-way ANOVA (without weight) does not have an $R^{2}$ component, but we can easily compute it (= Variability explained by model divided by overall variability in data)
+
+```{r}
+var(fitted(cabbages.aov)) / var(cabbages$VitC)
+
+# Or, alternatively, we can fit the same ANOVA using lm() and extract the R^2:
+cabbages.aov <- lm(VitC~Cult+Date, data=cabbages)
+summary(cabbages.aov)$r.sq	# Note different output format compared to aov!
+```
+
+Finally, for completeness and for illustration, we also fit the "Null" model (intercept only) and the full model with ALL interaction before we select the best among all of the candidate models:
+
+```{r}
+cabbages.0 <- lm(VitC ~ 1, data=cabbages) # Intercept only!
+summary(cabbages.0) 		
+# Full model including interactions between all explanatory variables:
+cabbages.full <- update(cabbages.0, .~.+HeadWt*Cult*Date)
+anova(cabbages.full)
+```
+
+The Anova Table, which shows F-tests and corresponding p-values for each term (The F-test tests whether the model with the term included fits significantly better than the model without the term (null hypothesis). A small p-value suggests that the model term is significant and should be included! In this case, none of the interactions appear signficant.
+
+## 'add1()` and `drop1()`
+For completeness, I will introduce two other functions that come in very handy when comparing different models. The first is `add1()`, which starts with a "small" model (for example the NULL model) and adds one term at a time to the model, as defined by the 'scope', which can be any "bigger"" model (where the smaller model has to be nested within the bigger model):
+
+```{r}
+add1(cabbages.0, scope = cabbages.ancova)
+```
+
+The output shows the residual sum of squares (RSS) that is achieved by including one term at a time to the null model, as well as the value of the AIC model selection criterion for the model with the additional variable (smaller is better for the AIC!). This shows that adding 'HeadWt' results in the largest drop in the RSS and the largest improvement in AIC, whereas 'Date' alone does not improve the model by much.
+
+For illustration, I'll show you how to compute the results from add 1 'manually' using the function `deviance()`, which computes (surprise!) the deviance of the model. In the case of a linear model, the deviance is simply the residual sum of squares. Similarly, we can extract the AIC values from a fitted model using the function `AIC()`:
+
+```{r}
+deviance(cabbages.0)
+deviance(update(cabbages.0, .~.+HeadWt))
+deviance(update(cabbages.0, .~.+Cult))
+deviance(update(cabbages.0, .~.+Date))
+AIC(cabbages.0)
+AIC(update(cabbages.0, .~.+HeadWt))
+AIC(update(cabbages.0, .~.+Cult))
+```
+
+Compare the deviances to the RSS values returned by `add1()`. Note that the absolute values for AIC (which are meaningless by themselves - only differences are relevant) is different from the AIC values returned by `add1()`, but the differences between models are the same!
+
+Conversely, we can use the `drop1()` function to start with a "big" model and drop one term at a time to examine the changes in RSS and AIC that result from dropping a given term. Let's start with the full model:
+
+```{r}
+drop1(cabbages.full, scope = cabbages.full)
+```
+
+Finally, we can fit a step-wise regression to 'automatically' select the AIC-best model (see help file for 'step' for details on the algorithm used if you are so inclined - there are lots of different approaches to step-wise regression).  
+
+```{r}
+cabbages.step <- step(cabbages.full)
+summary(cabbages.step) # "Best" model based on step-wise regression
+# ANOVA table for final model returned by 'step'
+anova(cabbages.step)
+# Compare null model, "best" stepwise model, and full model in terms of AIC:
+AIC(cabbages.0, cabbages.step, cabbages.full)
+```
+
+All our model approaches here point to the model with the three main effects and no interactions as the best model for predicting Vitamin C content. Once you have a satisfactory model (or a set of models if several models are very similar), it is always desirable to visualize the results. A very nice function to visualize results form a variety of models is provided in the 'visreg' package. It allows you to easily plot partial fits with confidence intervals for all of the main effects in the models (as well as for interactions, when needed, although interactions are always a bit trickier).
+(Run `install.packages("visreg")` first as needed)
+
+```{r}
+library(visreg)
+par(mfrow=c(2,2), mar=c(4,4,1,1))
+visreg(cabbages.step)
+```
+
+Finally, we may want to predict the Vitamin C content for a 'new' head of cabbage.
+As e saw earlier, we can use `predict()` to predict Vitamin C content for a new data point:
+
+```{r}
+New <- data.frame(Cult="c39", Date="d16", HeadWt=4.0)
+predict(cabbages.step, New)
+```
+
