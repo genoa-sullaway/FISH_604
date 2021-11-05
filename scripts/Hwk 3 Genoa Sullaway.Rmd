@@ -1,25 +1,22 @@
 ---
-title: "Hwk 3 Genoa Sullaway"
-output:
+title: "Homework 3"
+subtitle: "Genoa Sullaway"
+output: 
   word_document:
-    toc: yes
-    toc_depth: '2'
+  fig_crop: no
 ---
 
-
-# TO DO -- FIGUURE OUT FIGURE SIZES IN RMD, NEED  TO BE  BIGGER
-# HYPOTHESES COULD BE BETTER?
-# FIGURE LABEL #S AND REFERENCE THEM IN TEXT
-# MAKE  SURE REFERENCES ARE SET UP RIGHT
-# ANY OTHER PLOTS?
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 library(here)
 library(tidyverse)
 library(sf)
 library(maps)
+library(viridis)
 library(raster)
 library(corrplot)
+library(knitr)
+#library(kableExtra)
 theme_set(theme_classic())
 
 ```
@@ -38,7 +35,7 @@ ak <- sf::st_as_sf(maps::map('world','USA:Alaska',
                              plot=FALSE, fill=TRUE))
 
 #create bounds to trim AK map 
-bounds_ak <- extent(-176,-150,50,66 )
+bounds_ak <- extent(-176,-156,54,65 )
 #bounds_ak <- extent(-164.5,-160, 55,60) 
 extent_ak <- st_set_crs(st_as_sf(as(bounds_ak, "SpatialPolygons")), 4326)
 ak <- st_intersection(ak, extent_ak) #trim map by intersections 
@@ -53,123 +50,256 @@ ak <- st_intersection(ak, extent_ak) #trim map by intersections
 ```
 
 ## Preliminary Title: 
-Evaluating Spatial Variance in *Calanus marshallae* distribution during the 2014-2106 Marine Heatwave in the Eastern Bering Sea
+Evaluating spatial variability in *Calanus marshallae* distribution during the 2014-2016 Marine Heatwave in the Eastern Bering Sea
 
-## Introduction/Background
-Marine heatwaves (MHW) have become more prevalent as anthropogenic climate change impacts progress (Frolicher et  al 2018). In  the Northeast Pacific Ocean, the most recent MHW (2014-2016) resulted in mass mortalities  and marine mammal strandings, species distribution shifts, fishery closures and social-ecological network shifts (Cheng and Frolicher 2020, Fisher et al 2021). 
+## Introduction/Background:
+Marine heatwaves (MHW) have become more prevalent as anthropogenic climate change progresses (Frolicher et  al. 2018). In  the Northeast Pacific Ocean, the most recent MHW (2014-2016) resulted in mass mortalities  and marine mammal strandings, species distribution shifts, fishery closures, and social-ecological network shifts (Cheng and Frolicher 2020, Fisher et al. 2021). 
 
-Primary and secondary production are tightly linked to oceanographic conditions. In the E. Bering Sea, copepods such as *Calanus spp*, underpin the health of the entire ecosystem. As high nutrient prey items, Calanus support marine mammals, numerous subsistence fisheries and a billion-dollar Pollock fishery. However, copepod abundance and community composition are heavily regulated by environmental factors. During cold years, large nutritious copepods are abundant and persist throughout the season to feed age-0 pollock in Fall. However, during warm years, the zooplankton community composition transitions to smaller less nutritious species and large copepods are often absent on the inner shelf in Fall when pollock are preparing to overwinter (Kimmel et al 2018). This disruption in lipid-rich prey in warm years has negative cascading effects throughout the EBS food web and social ecological networks. 
+Primary and secondary production are tightly linked to oceanographic conditions and are thus heavily influenced by MHW's. In the Eastern Bering Sea (EBS), copepods such as *C. marshallae* underpin the structure of the entire ecosystem. As high nutrient prey items, *C. marshallae* support marine mammals, numerous subsistence fisheries and a billion-dollar Pollock fishery. However, copepod abundance and community composition are heavily regulated by environmental factors (Siddon et al 2013). During cold years, large nutritious copepods are abundant into the Fall and are key prey items for pollock (Siddon et al 2013), seabirds (Springer et al 1986) and marine mammals (Baumgartner et al. 2013). *C. marshallae* abundance is tightly linked with pollock recruitment through the Oscillating Control Hypothesis (Kimmel et al. 2018). In warm stanzas, the zooplankton community is  dominated by smaller species with lower lipid content (Kimmel et al 2018) often resulting in poor pollock recruitment. This disruption in lipid-rich prey during warm years has negative effects that cascade throughout the EBS food webs and social-ecological networks. 
 
-  If Calanus spatial heterogeneity exists within warm years, this could provide spatial refuges for predators where they still have access to high quality prey items. On the other hand, large scale climate events can lead to increases in spatial synchrony across increasingly large distances. A large spread marine heatwave may increase synchrony in Calanus abundance across the EBS, and this can have cascading negative effects through the ecosystem. Moreover, changes to spatial variability in Calanus within warm years can have implications for future predator-prey overlap (Siddon et al 2013). 
+Large scale climate events can lead to increases in spatial synchrony across increasingly large distances (Hanson et al. 2020). MHW's may increase synchrony in *C. marshallae* abundance across the EBS, and this can have cascading negative effects through the ecosystem. Moreover, changes to spatial variability in *C. marshallae* within warm years can have implications for future predator-prey overlap (Siddon et al 2013). This research aims to understand the spatial dynamics of *C. marshallae* within warm years, and (if time allows) the impact of successive warms years on abundance. 
 
 ## Goals and Objectives
 
-The research question I would like to address is: Is there spatial variation in Calanus abundance during the 2014-2016 Marine Heatwave in the Eastern Bering Sea?  
+The research question I would like to address is: Is there spatial variation in *C. marshallae* abundance during the 2014-2016 Marine Heatwave in the Eastern Bering Sea?  
 
-Warm stanzas and marine heatwaves are predicted to become more common in the EBS. I want to understand the spatial variability for Calanus among warm years, to ultimately inform the spatial availability of Calanus prey for higher trophic levels. Does the EBS become a "food desert" for higher trophic levels or are there certain spatial refuges during warm years? 
+Warm stanzas and marine heatwaves are predicted to become more common in the EBS. I want to understand the spatial variability for *C. marshallae* among warm years, to ultimately inform the spatial availability of *C. marshallae* prey for higher trophic levels. Does the EBS become a "food desert" for higher trophic levels or are there certain spatial refuges during warm years? 
 
-Generally, copepod abundance and phenology are tightly linked to oceanographic conditions. Thus, I expect variation in temperature to be a strong predictor in C. marshallae CPUE. With greater temperatures resulting in less Calanus. I expect there may be effects related to years since the onset of the marine heatwave, ie I expect 2014 to be different than 2016 because of cumulative impacts of warm years. I expect *Calanus* to be more abundance in the northern inner shelves compared to the southern and outer shelves because of past *Calanus* research demonstrating higher abudnance on inner shelves, additionally, temperatures in the Norther regions were slightly cooler than the south and I expect this to contribute to *Calanus* spatial variation. 
+Generally, copepod abundance and phenology are tightly linked to oceanographic conditions. I expect variation in temperature to be a strong predictor in *C. marshallae* CPUE. Specifically, I expect a negative linear or second order polynomial relationship between temperature and *C. marshallae* abundance. I have not found evidence of a non-linear relationship like this in the literature, but I could imagine a threshold effect where temperature gets too high and *C. marshallae* abundance is consistently low past a certain high temperature threshold. Additionally, I expect an effect of year as the MHW progresses, ie. I expect 2014 to be different than 2016 because of cumulative impacts of warm years. I expect *C. marshallae* to be more abundant in the northern inner shelves compared to the southern and outer shelves, but mediated by temperature (Kimmel et al 2018).
 
-I will need to test for colinearity across covariates, I may not need all the covariates I propose. For example, depth, temperature and Ortiz region may be confounded since Ortiz regions were delineated based on oceanographic bounds and shelf breaks that differ by depth and temperature. 
+Proportional wind direction has a significant impact on the  Bering Sea ecosystem (Danielson et al 2012), I expect a positive linear relationship between the proportion of NE wind and *C. marshallae* CPUE, because NW wind encourages colder conditions and southern ice flow. Additionally, I expect a negative linear relationship between proportion of SE wind and  *C. marshallae* CPUE, however I expect SW winds to be more prevalent during the MHW years that I am examining. 
 
--wind? salinity?
-talk about  mutlicoollinearity
+## Data Description & Collection Methods
 
-## Data Description
+Data were collected by NOAA AFSC ECOFOCI during at-sea oceanographic cruises in the Eastern Bering Sea (Figure 1). Zooplankton data were provided by Dr. Dave Kimmel. The response variable is *Calanus marshallae* catch per unit effort (CPUE) (individuals m^3) for each station (each point in Figure 1) sampled in each year of the recent MHW (2014-2016). 
 
-Data were collected by NOAA AFSC ECOFOCI during at-sea oceanographic cruises in the Eastern Bering Sea (Figuure XX) and zooplankton data were provided to GS by Dr. Dave Kimmel. These  data are part of a larger zooplankton community dataset from the eastern Bering Sea. The response variable is *Calanus marshallae* catch per unit effort (CPUE) (individuals m^3) for each station (each point in figure XX) sampled in each year. 
+Zooplankton data are collected annually on NOAA oceanographic cruises from April-October, however the spatial and temporal schedule is unbalanced from year to year (Figure 1). Copepods are collected using paired bongo nets (20cm frame, 150um mesh and a 60cm frame, 333 um mesh) on oblique tows. The tow depth varies by station and is not necessarily related to bottom depth. If bottom depth is less than 100m, max tow depth is 5-10m above the bottom. However, if max bottom depth is deeper than 100m the max gear depth can vary depending on the sea state, most tows are not deeper than 300m. The samples are identified to lowest taxonomic level and sorted into different stages (C-1 to C-6), however for this analysis I have summed *C. marshallae* CPUE across life stages. 
 
-Zooplankton data are collected annually on NOAA oceanographic cruises from April-September, however the spatial and temporal schedule is unbalanced from year to year (Figure XX). Copepods are collected using paired bongo nets (20cm frame, 150um mesh and a 60cm frame, 333 um mesh) on oblique tows. The tow depth varies by station and is not necessarily related to bottom depth. If bottom depth is less than 100m, max tow depth is 5-10m above the bottom. However, if max bottom depth is deeper than 100m the max gear depth can vary depending on the sea state, most tows are not deeper than 300m. The samples are identified to lowest taxonomic level and sorted into different stages (C-1 to C-6), however at this point, I summed Calanus CPUE across lifestages. 
+Some covariate data is collected onboard the ship, for example maximum bottom depth and gear depth are recorded on the zooplankton gear deployment. Salinity and temperature covariates were collected from CTD casts done in parallel to zooplankton net casts. 
 
-Some covariate data is collected onboard the ship, for example maximum bottom depth and gear depth are recorded on the zooplankton gear deployment. Salinity and temperature covariates were collected from CTD casts done in parallel to zooplankton net casts. Covariates such as wind stress and cold pool extent were downloaded from publicly available climate dataset provided by Dr. Mike Litzlow (NOAA AFSC, https://github.com/mikelitzow/bold-new-pollock/tree/master/data). 
+Covariates such as proportional daily wind direction and cold pool extent were downloaded from publicly available climate dataset provided by Dr. Mike Litzlow (NOAA AFSC, https://github.com/mikelitzow/bold-new-pollock/tree/master/data). The proportion of daily wind from the SE/NW from May to September is used as a simple index for changes in Bering Sea advection (Danielson et al 2012). Summer cold pool extent is calculated on the NMFS bottom trawl survey. Finally, we use Domain as a covariate to represent the Ortiz Regions. These regions have been established based on known differences across oceanographic breaks in the Bering Sea.
 
-Exploratory data analysis demonstrate that there is unbalanced sampling of stations across years (Figure XX). A coplot of select covariates indicate possible relationships between depth salinity and temperature. We see that there is more variation in temperature and salinity at shallower depths across years. Additionally, there is generally less variation in temperature at depth, which is expected based on the differences in water mixing. Interestingly, it appears that temperatures at depth get warmer and have less variability from 2014 to 2016 (Figure XX). 
 
-```{r PLOT ALL DATA, fig.width=14, fig.height=8 }
+Exploratory data analysis demonstrate that there is unbalanced sampling of stations across years (Table 1, Figure 1). Exploratory plots indicate spatial variability in *C. marshallae* abundance and temperature throughout the EBS  (Figure 1 and 2). A coplot of select covariates indicate possible relationships between depth, salinity and temperature. We see that there is more variation in temperature and salinity at shallower depths across years (Figure 3). It also appears there is generally less variation in temperature at depth, which is expected based on the differences in water mixing. Interestingly, temperatures at depth is warmer and less variable as the MHW progresses (Figure 3).
+
+\n
+
+```{r data table }
+library(knitr)
+
+temp <- unique(df[c("YEAR", "STATION_NAME")])
+
+station_year <-temp %>% 
+   mutate(id=1) %>%
+   group_by(YEAR) %>%
+   dplyr::summarise(value = sum(id)) %>%
+   dplyr::rename(variable = "YEAR") %>%
+   mutate(temp = "Stations surveyed per year, ") %>%
+   dplyr::select(temp, variable, value) %>%
+   tidyr::unite("variable", 1:2, sep = "")
+  
+
+depth <- df %>%
+  dplyr::summarise(Min_Gear_Depth = min(MAX_GEAR_DEPTH), 
+            Max_Gear_Depth = max(MAX_GEAR_DEPTH)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Survey Depth m (Min, Max)") %>%
+   slice(1) 
+ 
+gear <-df %>%
+  summarise(value = unique(GEAR_NAME)) %>%
+  mutate(variable = "Gear Type") %>%
+  mutate(value = paste(value, collapse=", ")) %>%
+  slice(1) 
+
+salinity <- df %>%
+  dplyr::summarise(Min_Salinity = round(min( SALINITY,  na.rm = T)),
+            Max_Salinity = round(max(SALINITY, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Salinity ppm (Min, Max)") %>%
+   slice(1)
+
+temperature <- df %>%
+  dplyr::summarise(Min_Temp = round(min( TEMPERATURE,  na.rm = T)),
+            Max_Temp = round(max(TEMPERATURE, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Temperature C (Min, Max)") %>%
+   slice(1)
+
+wind.nw <- df %>%
+  dplyr::summarise(Min_NW_Wind = round(min(NW.wind.May.Sep,  na.rm = T), digits = 2),
+            Max_NW_Wind =  round(max(NW.wind.May.Sep, na.rm = T), digits = 2)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Propotion Daily NW Wind (Min, Max)") %>%
+   slice(1)
+
+wind.se <- df %>%
+  dplyr::summarise(Min_SE_Wind = round(min( SE.wind.May.Sep,  na.rm = T), digits = 2),
+            Max_SE_Wind = round(max(SE.wind.May.Sep, na.rm = T), digits = 2)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Proportion Daily SE Wind (Min, Max)") %>%
+   slice(1)
+
+coldpool <- df %>%
+  dplyr::summarise(Min_Cold_Pool = round(min(summer.cold.pool.extent,  na.rm = T)),
+            Max_Cold_Pool = round(max(summer.cold.pool.extent, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Summer Cold Pool Extent km (Min, Max)") %>%
+   slice(1)
+ 
+ table <-rbind(station_year, depth, gear, salinity,temperature,wind.se,wind.nw,coldpool) %>%
+  dplyr::rename(Variable = "variable", Value = "value")
+
+```
+
+\n
+
+\n
+
+```{r }
+kable(table,caption = "Table 1. Table of data structure")
+```
+
+
+```{r, eval = FALSE}
+
+table<-df %>% 
+  slice(1:5) %>%
+  mutate()
+  dplyr::select(CRUISE, BOTTOM_DEPTH,YEAR, MONTH,DAY,GEAR_NAME,MAX_GEAR_DEPTH,STATION_NAME, EST_NUM_PERM3, LAT, LON,SALINITY, TEMPERATURE, SE.wind.May.Sep, NW.wind.May.Sep, summer.cold.pool.extent)
+
+kable(table) %>%
+  kable_styling(font_size = 7)
+```
+
+\n
+\n
+I will need to test for multicolinearity across covariates, it is likely I do not need all the covariates I propose below. For example, depth, temperature and Ortiz region may be confounded since Ortiz regions were delineated based on oceanographic bounds and shelf breaks that differ by depth and temperature.  
+
+\n
+
+```{r PLOT ALL DATA, fig.cap ="Figure 1. *C. marshallae* log CPUE (individuals m^3) in the Eastern Bering Sea, where a point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE of *C. marshallae* at each station in each  year", fig.width=18, fig.height=8}
  #plot abundances for each station/time point. Color by Domain. 
 df_summary<- df %>%
   group_by(YEAR, LAT, LON) %>%
-  summarise(sum = sum(EST_NUM_PERM3))
+  dplyr::summarise(sum = sum(EST_NUM_PERM3))
 
 ggplot(ak) +
   geom_sf() +
   geom_point(data = df_summary, aes(x=LON, y=LAT, color = log(sum))) + #, size = EST_NUM_PERM3))+
   theme_classic() +
-  scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
- # guides(color=guide_legend(title="Log(CPUE)")) + 
-  theme( 
-        plot.caption = element_text(hjust = 0),
+  scale_color_viridis() +
+  labs(color= "Log(CPUE)")  +
+  #scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
+  #guides(color=guide_legend(title="Log(CPUE)")) + 
+  theme( strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom", 
+        legend.text=element_text(size=15),
+        legend.title = element_text(size=15),
+        plot.caption = element_text(hjust = 0, size =10),
         axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank(),
         axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank()) +
-  facet_wrap(~YEAR) +
-  labs(caption = "A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE for calanus marshallae for each station in each  year")
+  facet_wrap(~YEAR) #+
+ # labs(caption = "Figure 1. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE for calanus marshallae for each station in each  year")
 
 ```
 
-```{r PLOT TEMPERATURE,fig.width=14, fig.height=8}
+\n
 
+```{r PLOT TEMPERATURE, fig.cap ="Figure 2. Eastern Bering Sea temperature data (C) where a point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year", out.width='\\textwidth',fig.align='center', fig.width=18, fig.height=8}
 ggplot(ak) +
   geom_sf() +
   geom_point(data = df, aes(x=LON, y=LAT, color = TEMPERATURE)) + #, size = EST_NUM_PERM3))+
   theme_classic() +
   scale_color_gradient(low = "blue", high = "red", name = "Log C. marshallae CPUE") +
- # guides(color=guide_legend(title="Log(CPUE)")) + 
-  theme( 
-        plot.caption = element_text(hjust = 0),
+  labs(color= "Temperature")  +
+  theme(  strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom",    
+        plot.caption = element_text(hjust = 0, size =10),
+        legend.title = element_text(size=15),
+        legend.text=element_text(size=15),
         axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank(),
         axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank()) +
-  facet_wrap(~YEAR) +
-  labs(caption = "A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year")
+  facet_wrap(~YEAR) #+
+#  labs(caption = "Figure 2. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year")
 
 ```
 
+\n
 
-```{r plot coplot depth SST and salinity}
+```{r plot coplot depth SST and salinity, fig.cap="Figure 3. Relationship between some covariates used in the analysis, \n temperature, salinity, maximum gear depth and year from\n stations where zooplankton were surveyed" }
 #remove one salinity outlier 
 df_no_sal <- df %>%
   filter(!SALINITY<23 )
 
 coplot(SALINITY~TEMPERATURE|MAX_GEAR_DEPTH * as.factor(YEAR), data = df_no_sal, number=c(4,3))
-mysubtitle = "Figure XX. Coplot demonstrating the\nrelationship between temperature, \nsalnity, maximum gear depth and year from\n stations where zooplankton were surveyed"
+mysubtitle = "Figure 3. Coplot demonstrating the\nrelationship between temperature (C), \nsalnity (ppm), maximum gear depth (m) and year from\n stations where zooplankton were surveyed"
 mtext(side=3, line= -28, at=-0.2, adj=0, cex=0.7, mysubtitle)
 
 ```
 
-```{r }
+\n
+
+```{r data histogram, fig.cap="Figure  4a. Log-transformed CPUE (individuals m^3) for the complete  *C. marshallae* dataset"}
 df %>%
   ggplot() +
-  geom_histogram(aes(log(EST_NUM_PERM3)))+
-  labs(caption = "Figure  XX. Log-transformed CPUE for the complete  Calanus  marshallae dataset")
+  geom_histogram(aes(log(EST_NUM_PERM3))) + 
+  xlab("Log CPUE") +
+  ylab("Count") 
+  #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
+```
 
+\n
+
+```{r by year data histogram, fig.cap="Figure  4b. Log-transformed *C. marshallae* CPUE (individuals m^3) by year"}
+df %>%
+  ggplot() +
+  geom_histogram(aes(log(EST_NUM_PERM3) ))+
+  facet_wrap(~YEAR)+ 
+  ylab("Count") + 
+  xlab("Log CPUE")
+  #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
 ```
 
 ## Methods
-- These data may have spatial autocorrelation and they may have a slight right skew. However, with a log transformation (Figure XX) data appear normal, so I will use a log normal distribution with a log link for the model.  
 
-- The random  variable we want to predict is Calanus CPUE where $\gamma_i$ = Calanus m-3
+These data may have spatial autocorrelation and they may have a slight right skew (though this relationship changes when data are plotted by year). However, with a log transformation (Figure 4) data appear normal, so I propose to use a log normal distribution with a log link for the model. The random variable I would like to estimate is *C. marshallae* CPUE where $\gamma_i$ = Calanus m-3
   
+$$log(\gamma_{s,y}) \sim LogNormal(\mu_{s,y},\sigma^2) $$
 
-$$log(\gamma_{i,s,y}) \sim LogNormal(\mu_{i,s,y},\sigma^2) $$
+$log(\mu_{s,y}) = B_{0s} + B_1Depth_{s,y} + B_2Temp_{s,y} + B_3SAL_{s,y} + B_4Wind_{nw,y} + B_5Wind_{se,y}+  B_6CP_y + B_7Domain_s + B_8SAL_{s,y}+ \varepsilon_s$
 
-$$log(\mu_{s,y})= B_{0s} + B_1Depth_{s,y} + B_2Temp_{s,y} + B_3SAL_{s,y} + B_4Wind_{n,y} + B_5CP_y + B_6Domain_s + B_7SAL_{s,y}+ \varepsilon$$
-$$\varepsilon = MVN(0,\sigma)$$
+$$\varepsilon_s = MVN(0,\sigma)$$
 
-Where $B_{0i}$ is the random effect of year (note I am interested in looking at temporal autocorrelation, I think the order of the year matters as the heatwave progresses), $Depth_{s,y}$  is the survey depth, $Temp_{s,y}$ is the mean temperature at each station for each year, $SAL_{s,y}$ is the mean salinity at each station  for each year, $Wind_{n,y}$ is the wind stress for each direction (north or south) for each year, $CP_y$ is the cold pool  extent for that year, $Domain_s$ is the station domain related to the Ortiz regions delineated by oceanographic bounds. The error term, $\varepsilon_i$, is assumed to be multivariate normally distributed and $\sigma$ will be composed of a variance-covariance matrix that accounts for spatial autocorrelation.
+Where $B_{0s}$ is the random effect of year (note I am interested in looking at temporal autocorrelation, I think the order of the year matters as the heatwave progresses), $Depth_{s,y}$  is the survey depth, $Temp_{s,y}$ is the mean temperature (by survey depth) at each station for each survey, $SAL_{s,y}$ is the mean salinity (by survey depth) at each station for each survey, $Wind_{nw,y}$ is the proportional daily wind from the NW for each year, $Wind_{se,y}$ is the proportional daily wind from the SE for each year, $CP_y$ is the cold pool extent for that year, $Domain_s$ is the station domain related to the Ortiz regions delineated by oceanographic bounds. The error term, $\varepsilon_i$, is assumed to be multivariate normally distributed and $\sigma$ will be composed of a variance-covariance matrix that accounts for spatial autocorrelation, if necessary.
 
-Back-transformed results will under go a bias correction.
- 
-- W = wind (north and south) for each year (y) DECIDE  WHICH WIND  METRIC TO  USE
+Back-transformed results will under-go a bias correction.
+
+## Acknowledgements
+Thank you to Courtney Weiss and Molly Payne for providing comments. Thank you to Dave Kimmel for providing data and for reviewing ideas with me during the project. 
 
 ## References
-- Cheung, W.W.L., Frölicher, T.L. Marine heatwaves exacerbate climate change impacts for fisheries in the northeast Pacific. Sci Rep 10, 6678 (2020). https://doi.org/10.1038/s41598-020-63650-z
-- Frölicher, Thomas L., Erich M. Fischer, and Nicolas Gruber. "Marine heatwaves under global warming." Nature 560.7718 (2018): 360-364.
-- Fisher, Mary C., Stephanie K. Moore, Sunny L. Jardine, James R. Watson, and Jameal F. Samhouri. "Climate shock effects and mediation in fisheries." Proceedings of the National Academy of Sciences 118, no. 2 (2021).
-- Siddon, Elizabeth Calvert, Trond Kristiansen, Franz J. Mueter, Kirstin K. Holsman, Ron A. Heintz, and Edward V. Farley. "Spatial match-mismatch between juvenile fish and prey provides a mechanism for recruitment variability across contrasting climate conditions in the eastern Bering Sea." PLoS One 8, no. 12 (2013): e84526.
+- Baumgartner, M. F., Lysiak, N. S., Esch, H. C., Zerbini, A. N., Berchok, C. L., & Clapham, P. J. (2013). Associations between North Pacific right whales and their zooplanktonic prey in the southeastern Bering Sea. Marine Ecology Progress Series, 490, 267-284.
+- Cheung, W.W.L., T.L. Frölicher (2020) Marine heatwaves exacerbate climate change impacts for fisheries in the northeast Pacific. Sci Rep 10, 6678 https://doi.org/10.1038/s41598-020-63650-z
+- Danielson, S., Hedstrom, K., Aagaard, K., Weingartner, T., & Curchitser, E. (2012). Wind-induced reorganization of the Bering shelf circulation. Geophysical Research Letters, 39(8), L08601. https://doi.org/10.1029/2012gl051231
+- Fisher, M.C., S.K. Moore, S.L. Jardine, J.R. Watson, & J.F. Samhouri (2021) Climate shock effects and mediation in fisheries. Proceedings of the National Academy of Sciences 118, no. 2.
+- Frölicher, T.L., E.M. Fischer, & N Gruber. (2020) Marine heatwaves under global warming." Nature 560.7718 (2018): 360-364.
+- Hansen, B. B., Grøtan, V., Herfindal, I., & Lee, A. M. (2020) The Moran effect revisited: spatial population synchrony under global warming. Ecography, 43(11), 1591-1602.
+- Siddon, E.C., T. Kristiansen, F.J. Mueter, K.K. Holsman, R.A. Heintz, and E.V. Farley. (2013) Spatial match-mismatch between juvenile fish and prey provides a mechanism for recruitment variability across contrasting climate conditions in the eastern Bering Sea. PLoS One 8, no. 12 (2013): e84526.
+- Springer, A. M., Roseneau, D. G., Lloyd, D. S., McRoy, C. P., & Murphy, E. C. (1986). Seabird responses to fluctuating prey availability in the eastern Bering Sea. Marine Ecology Progress Series, 1-12.

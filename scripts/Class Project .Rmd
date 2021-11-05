@@ -1,0 +1,858 @@
+---
+title: "Homework 3"
+subtitle: "Genoa Sullaway"
+output: 
+  word_document:
+  fig_crop: no
+---
+----- builds off the HWK 3 script, started this after I turned in HW 3. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(here)
+library(tidyverse)
+library(sf)
+library(maps)
+library(viridis)
+library(raster)
+library(corrplot)
+library(knitr)
+library(mapproj)
+library(sp)
+library(mgcv)
+library(GGally)
+library(mgcViz) #helpful for model plotting and checking:: https://cran.r-project.org/web/packages/mgcViz/vignettes/mgcviz.html
+#library(kableExtra)
+theme_set(theme_classic())
+
+```
+
+```{r LOAD DATA}
+#load data that was created by : final_DF_EDA_StatsProj.R
+df <- read_csv(here("data","fulldata_stats_proj.csv")) 
+
+df_summary<- df %>%
+  group_by(YEAR, LAT, LON, TEMPERATURE, SALINITY, DOMAIN, MAX_GEAR_DEPTH, BOTTOM_DEPTH, SE.wind.May.Sep, NW.wind.May.Sep, summer.cold.pool.extent) %>%
+  dplyr::summarise(sum = sum(EST_NUM_PERM3))
+```
+
+```{r create base maps shape file,include=FALSE}
+#create base map
+ak <- sf::st_as_sf(maps::map('world','USA:Alaska',
+                             # ylim = c(55,60),
+                             #   xlim=c(-140,-130), 
+                             plot=FALSE, fill=TRUE))
+
+#create bounds to trim AK map 
+bounds_ak <- extent(-176,-156,54,65 )
+#bounds_ak <- extent(-164.5,-160, 55,60) 
+extent_ak <- st_set_crs(st_as_sf(as(bounds_ak, "SpatialPolygons")), 4326)
+ak <- st_intersection(ak, extent_ak) #trim map by intersections 
+ plot(ak)
+ 
+#load shape file with ortiz shapes 
+# ortiz_shp <- st_read("data/ortiz_regions/BSIERP_regions_2012.shp")
+# ortiz_shp <- subset(ortiz_shp, !DOMAIN == 15)
+# #Tranform into WGS84 coordinate system
+# ortiz_shp <- st_transform(ortiz_shp, "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+
+# 
+#  sf::st_as_sf(maps::map('world','USA:Alaska',
+#                             # ylim = c(40,75),
+#                               xlim=c(-175,-115), 
+#                              plot=TRUE, fill=FALSE))
+```
+
+## Preliminary Title: 
+Evaluating spatial variability in *Calanus marshallae* distribution during the 2014-2016 Marine Heatwave in the Eastern Bering Sea
+
+## Introduction/Background:
+Marine heatwaves (MHW) have become more prevalent as anthropogenic climate change progresses (Frolicher et  al. 2018). In  the Northeast Pacific Ocean, the most recent MHW (2014-2016) resulted in mass mortalities  and marine mammal strandings, species distribution shifts, fishery closures, and social-ecological network shifts (Cheng and Frolicher 2020, Fisher et al. 2021). 
+
+Primary and secondary production are tightly linked to oceanographic conditions and are thus heavily influenced by MHW's. In the Eastern Bering Sea (EBS), copepods such as *C. marshallae* underpin the structure of the entire ecosystem. As high nutrient prey items, *C. marshallae* support marine mammals, numerous subsistence fisheries and a billion-dollar Pollock fishery. However, copepod abundance and community composition are heavily regulated by environmental factors (Siddon et al 2013). During cold years, large nutritious copepods are abundant into the Fall and are key prey items for pollock (Siddon et al 2013), seabirds (Springer et al 1986) and marine mammals (Baumgartner et al. 2013). *C. marshallae* abundance is tightly linked with pollock recruitment through the Oscillating Control Hypothesis (Kimmel et al. 2018). In warm stanzas, the zooplankton community is  dominated by smaller species with lower lipid content (Kimmel et al 2018) often resulting in poor pollock recruitment. This disruption in lipid-rich prey during warm years has negative effects that cascade throughout the EBS food webs and social-ecological networks. 
+
+Large scale climate events can lead to increases in spatial synchrony across increasingly large distances (Hanson et al. 2020). MHW's may increase synchrony in *C. marshallae* abundance across the EBS, and this can have cascading negative effects through the ecosystem. Moreover, changes to spatial variability in *C. marshallae* within warm years can have implications for future predator-prey overlap (Siddon et al 2013). This research aims to understand the spatial dynamics of *C. marshallae* within warm years, and (if time allows) the impact of successive warms years on abundance. 
+
+## Goals and Objectives
+
+The research question I would like to address is: Is there spatial variation in *C. marshallae* abundance during the 2014-2016 Marine Heatwave in the Eastern Bering Sea?  
+
+Warm stanzas and marine heatwaves are predicted to become more common in the EBS. I want to understand the spatial variability for *C. marshallae* among warm years, to ultimately inform the spatial availability of *C. marshallae* prey for higher trophic levels. Does the EBS become a "food desert" for higher trophic levels or are there certain spatial refuges during warm years? 
+
+Generally, copepod abundance and phenology are tightly linked to oceanographic conditions. I expect variation in temperature to be a strong predictor in *C. marshallae* CPUE. Specifically, I expect a negative linear or second order polynomial relationship between temperature and *C. marshallae* abundance. I have not found evidence of a non-linear relationship like this in the literature, but I could imagine a threshold effect where temperature gets too high and *C. marshallae* abundance is consistently low past a certain high temperature threshold. Additionally, I expect an effect of year as the MHW progresses, ie. I expect 2014 to be different than 2016 because of cumulative impacts of warm years. I expect *C. marshallae* to be more abundant in the northern inner shelves compared to the southern and outer shelves, but mediated by temperature (Kimmel et al 2018).
+
+Proportional wind direction has a significant impact on the  Bering Sea ecosystem (Danielson et al 2012), I expect a positive linear relationship between the proportion of NE wind and *C. marshallae* CPUE, because NW wind encourages colder conditions and southern ice flow. Additionally, I expect a negative linear relationship between proportion of SE wind and  *C. marshallae* CPUE, however I expect SW winds to be more prevalent during the MHW years that I am examining. 
+
+## Data Description & Collection Methods
+
+Data were collected by NOAA AFSC ECOFOCI during at-sea oceanographic cruises in the Eastern Bering Sea (Figure 1). Zooplankton data were provided by Dr. Dave Kimmel. The response variable is *Calanus marshallae* catch per unit effort (CPUE) (individuals m^3) for each station (each point in Figure 1) sampled in each year of the recent MHW (2014-2016). 
+
+Zooplankton data are collected annually on NOAA oceanographic cruises from April-October, however the spatial and temporal schedule is unbalanced from year to year (Figure 1). Copepods are collected using paired bongo nets (20cm frame, 150um mesh and a 60cm frame, 333 um mesh) on oblique tows. The tow depth varies by station and is not necessarily related to bottom depth. If bottom depth is less than 100m, max tow depth is 5-10m above the bottom. However, if max bottom depth is deeper than 100m the max gear depth can vary depending on the sea state, most tows are not deeper than 300m. The samples are identified to lowest taxonomic level and sorted into different stages (C-1 to C-6), however for this analysis I have summed *C. marshallae* CPUE across life stages. 
+
+Some covariate data is collected onboard the ship, for example maximum bottom depth and gear depth are recorded on the zooplankton gear deployment. Salinity and temperature covariates were collected from CTD casts done in parallel to zooplankton net casts. 
+
+Covariates such as proportional daily wind direction and cold pool extent were downloaded from publicly available climate dataset provided by Dr. Mike Litzlow (NOAA AFSC, https://github.com/mikelitzow/bold-new-pollock/tree/master/data). The proportion of daily wind from the SE/NW from May to September is used as a simple index for changes in Bering Sea advection (Danielson et al 2012). Summer cold pool extent is calculated on the NMFS bottom trawl survey. Finally, we use Domain as a covariate to represent the Ortiz Regions. These regions have been established based on known differences across oceanographic breaks in the Bering Sea.
+
+
+Exploratory data analysis demonstrate that there is unbalanced sampling of stations across years (Table 1, Figure 1). Exploratory plots indicate spatial variability in *C. marshallae* abundance and temperature throughout the EBS  (Figure 1 and 2). A coplot of select covariates indicate possible relationships between depth, salinity and temperature. We see that there is more variation in temperature and salinity at shallower depths across years (Figure 3). It also appears there is generally less variation in temperature at depth, which is expected based on the differences in water mixing. Interestingly, temperatures at depth is warmer and less variable as the MHW progresses (Figure 3).
+
+\n
+
+```{r data table }
+library(knitr)
+
+temp <- unique(df[c("YEAR", "STATION_NAME")])
+
+station_year <-temp %>% 
+   mutate(id=1) %>%
+   group_by(YEAR) %>%
+   dplyr::summarise(value = sum(id)) %>%
+   dplyr::rename(variable = "YEAR") %>%
+   mutate(temp = "Stations surveyed per year, ") %>%
+   dplyr::select(temp, variable, value) %>%
+   tidyr::unite("variable", 1:2, sep = "")
+  
+
+depth <- df %>%
+  dplyr::summarise(Min_Gear_Depth = min(MAX_GEAR_DEPTH), 
+            Max_Gear_Depth = max(MAX_GEAR_DEPTH)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Survey Depth m (Min, Max)") %>%
+   slice(1) 
+ 
+gear <-df %>%
+  summarise(value = unique(GEAR_NAME)) %>%
+  mutate(variable = "Gear Type") %>%
+  mutate(value = paste(value, collapse=", ")) %>%
+  slice(1) 
+
+salinity <- df %>%
+  dplyr::summarise(Min_Salinity = round(min( SALINITY,  na.rm = T)),
+            Max_Salinity = round(max(SALINITY, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Salinity ppm (Min, Max)") %>%
+   slice(1)
+
+temperature <- df %>%
+  dplyr::summarise(Min_Temp = round(min( TEMPERATURE,  na.rm = T)),
+            Max_Temp = round(max(TEMPERATURE, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Temperature C (Min, Max)") %>%
+   slice(1)
+
+wind.nw <- df %>%
+  dplyr::summarise(Min_NW_Wind = round(min(NW.wind.May.Sep,  na.rm = T), digits = 2),
+            Max_NW_Wind =  round(max(NW.wind.May.Sep, na.rm = T), digits = 2)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Propotion Daily NW Wind (Min, Max)") %>%
+   slice(1)
+
+wind.se <- df %>%
+  dplyr::summarise(Min_SE_Wind = round(min( SE.wind.May.Sep,  na.rm = T), digits = 2),
+            Max_SE_Wind = round(max(SE.wind.May.Sep, na.rm = T), digits = 2)) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Proportion Daily SE Wind (Min, Max)") %>%
+   slice(1)
+
+coldpool <- df %>%
+  dplyr::summarise(Min_Cold_Pool = round(min(summer.cold.pool.extent,  na.rm = T)),
+            Max_Cold_Pool = round(max(summer.cold.pool.extent, na.rm = T))) %>%
+   gather(1:2, key = "variable", value = "value") %>%
+   mutate(value = paste(value, collapse=" - ")) %>%
+   mutate(variable = "Summer Cold Pool Extent km (Min, Max)") %>%
+   slice(1)
+ 
+ table <-rbind(station_year, depth, gear, salinity,temperature,wind.se,wind.nw,coldpool) %>%
+  dplyr::rename(Variable = "variable", Value = "value")
+
+```
+
+\n
+Is there multicolinearity??
+- I think this plot says yes... esp with salinity and temperature, also salinity and depth
+
+```{r covariate}
+df <- df_model %>%
+  filter(!SALINITY < 29)
+ggpairs(df[,c("sum", "TEMPERATURE", "SALINITY", "MAX_GEAR_DEPTH")], lower=list(continuous='smooth')) #est num, salinity, temp, depth
+ 
+#wind: ,31:32
+
+#coldpool -- 33 
+
+
+ggplot(df_model,aes(x=log(sum), y = TEMPERATURE)) +
+  geom_point( ) +
+  geom_smooth() + 
+  facet_wrap(~YEAR)
+
+ggplot(df_model,aes(x=log(sum), y = MAX_GEAR_DEPTH)) +
+  geom_point( ) +
+  geom_smooth() +
+  facet_wrap(~YEAR)
+
+ggplot(df_model,aes(x=log(sum), y = log(MAX_GEAR_DEPTH))) +
+  geom_point( ) +
+  geom_smooth()  
+
+ggplot(df_model,aes(x=log(sum), y = SALINITY)) +
+  geom_point( ) +
+  geom_smooth() +
+ facet_wrap(~YEAR)
+
+ggplot(df,aes(x=log(sum), y = SALINITY)) +
+  geom_point( ) +
+  geom_smooth()  
+
+
+
+```
+
+\n
+
+```{r }
+kable(table,caption = "Table 1. Table of data structure")
+```
+
+
+```{r, eval = FALSE}
+
+table<-df %>% 
+  slice(1:5) %>%
+  mutate()
+  dplyr::select(CRUISE, BOTTOM_DEPTH,YEAR, MONTH,DAY,GEAR_NAME,MAX_GEAR_DEPTH,STATION_NAME, EST_NUM_PERM3, LAT, LON,SALINITY, TEMPERATURE, SE.wind.May.Sep, NW.wind.May.Sep, summer.cold.pool.extent)
+
+kable(table) %>%
+  kable_styling(font_size = 7)
+```
+
+\n
+\n
+I will need to test for multicolinearity across covariates, it is likely I do not need all the covariates I propose below. For example, depth, temperature and Ortiz region may be confounded since Ortiz regions were delineated based on oceanographic bounds and shelf breaks that differ by depth and temperature.  
+
+\n
+
+```{r PLOT ALL DATA, fig.cap ="Figure 1. *C. marshallae* log CPUE (individuals m^3) in the Eastern Bering Sea, where a point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE of *C. marshallae* at each station in each  year", fig.width=18, fig.height=8}
+ #plot abundances for each station/time point. Color by Domain. 
+
+ggplot(ak) +
+  geom_sf() +
+  geom_point(data = df_summary, aes(x=LON, y=LAT, color = log(sum))) + #, size = EST_NUM_PERM3))+
+  theme_classic() +
+  scale_color_viridis() +
+  labs(color= "Log(CPUE)")  +
+  #scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
+  #guides(color=guide_legend(title="Log(CPUE)")) + 
+  theme( strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom", 
+        legend.text=element_text(size=15),
+        legend.title = element_text(size=15),
+        plot.caption = element_text(hjust = 0, size =10),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  facet_wrap(~YEAR) #+
+ # labs(caption = "Figure 1. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE for calanus marshallae for each station in each  year")
+
+```
+
+
+```{r PLOT ALL DATA, fig.cap ="Figure 1. *C. marshallae* log CPUE (individuals m^3) in the Eastern Bering Sea, where a point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE of *C. marshallae* at each station in each  year", fig.width=18, fig.height=8}
+ #plot abundances for each station/time point. Color by Domain. 
+df_summary<- df %>%
+  group_by(YEAR, LAT, LON) %>%
+  dplyr::summarise(sum = sum(EST_NUM_PERM3))
+
+ggplot(ak) +
+  geom_sf() +
+  geom_point(data = df_summary, aes(x=LON, y=LAT)) + #, size = EST_NUM_PERM3))+
+  theme_classic() +
+  # scale_color_viridis() +
+  # labs(color= "Log(CPUE)")  +
+  #scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
+  #guides(color=guide_legend(title="Log(CPUE)")) + 
+  theme( strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom", 
+        legend.text=element_text(size=15),
+        legend.title = element_text(size=15),
+        plot.caption = element_text(hjust = 0, size =10),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  facet_wrap(~YEAR) #+
+ # labs(caption = "Figure 1. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE for calanus marshallae for each station in each  year")
+
+```
+
+\n
+
+```{r PLOT TEMPERATURE, fig.cap ="Figure 2. Eastern Bering Sea temperature data (C) where a point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year", out.width='\\textwidth',fig.align='center', fig.width=18, fig.height=8}
+ggplot(ak) +
+  geom_sf() +
+  geom_point(data = df, aes(x=LON, y=LAT, color = TEMPERATURE)) + #, size = EST_NUM_PERM3))+
+  theme_classic() +
+  scale_color_gradient(low = "blue", high = "red", name = "Log C. marshallae CPUE") +
+  labs(color= "Temperature")  +
+  theme(  strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom",    
+        plot.caption = element_text(hjust = 0, size =10),
+        legend.title = element_text(size=15),
+        legend.text=element_text(size=15),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  facet_wrap(~YEAR) #+
+#  labs(caption = "Figure 2. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year")
+
+```
+
+\n
+
+```{r plot coplot depth SST and salinity, fig.cap="Figure 3. Relationship between some covariates used in the analysis, \n temperature, salinity, maximum gear depth and year from\n stations where zooplankton were surveyed" }
+#remove one salinity outlier 
+df_no_sal <- df %>%
+  filter(!SALINITY<23 )
+
+coplot(SALINITY~TEMPERATURE|MAX_GEAR_DEPTH * as.factor(YEAR), data = df_no_sal, number=c(4,3))
+mysubtitle = "Figure 3. Coplot demonstrating the\nrelationship between temperature (C), \nsalnity (ppm), maximum gear depth (m) and year from\n stations where zooplankton were surveyed"
+mtext(side=3, line= -28, at=-0.2, adj=0, cex=0.7, mysubtitle)
+
+```
+
+\n
+
+```{r data histogram, fig.cap="Figure  4a. Log-transformed CPUE (individuals m^3) for the complete  *C. marshallae* dataset"}
+df_summary %>%
+  ggplot() +
+  geom_histogram(aes(sum), bins = 50)+
+  xlab("Log CPUE") +
+  ylab("Count") 
+
+  #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
+
+test<- df_summary %>% 
+  filter(sum == 0) %>%
+  summarise(count(nrow()))
+
+test<- df_summary %>% 
+  filter(sum > 0) %>%
+  filter(sum<1) %>%
+  summarise(count(nrow()))
+
+test <- df_summary %>%
+  filter(!EST_NUM_PERM3 ==0) %>%
+  ggplot() +
+  geom_histogram(aes(EST_NUM_PERM3))+
+  xlab("Log CPUE") +
+  ylab("Count") 
+
+df_nozero %>%
+  ggplot() +
+  geom_histogram(aes(log(sum))) + 
+  xlab("Log CPUE") +
+  ylab("Count") 
+  #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
+```
+
+\n
+
+
+```{r by year data histogram, fig.cap="Figure  4b. Log-transformed *C. marshallae* CPUE (individuals m^3) by year"}
+df %>%
+  ggplot() +
+  geom_histogram(aes(log(EST_NUM_PERM3) ))+
+  facet_wrap(~YEAR)+ 
+  ylab("Count") + 
+  xlab("Log CPUE")
+  #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
+```
+
+## Methods
+
+These data may have spatial autocorrelation and they may have a slight right skew (though this relationship changes when data are plotted by year). However, with a log transformation (Figure 4) data appear normal, so I propose to use a log normal distribution with a log link for the model. The random variable I would like to estimate is *C. marshallae* CPUE where $\gamma_i$ = Calanus m-3
+  
+$$log(\gamma_{s,y}) \sim LogNormal(\mu_{s,y},\sigma^2) $$
+
+# explore gam, constrain smooth k 3-4. 
+# if I want to include wind or CP add it one at a time, if I use CP dont need to include year
+# 3-4 hypothesis based models
+
+$log(\mu_{s,y}) = \alpha + a_t + b_sDomain_s + B_1Depth_{s,y} + B_2Temp_{s,y} + B_3SAL_{s,y} + B_4Wind_{nw,y} + B_5Wind_{se,y}+  B_6CP_y + \varepsilon_s$
+
+$$\varepsilon_s = MVN(0,\sigma)$$
+
+Where $b_{0s}$ is the random effect of year (note I am interested in looking at temporal autocorrelation, I think the order of the year matters as the heatwave progresses), $Depth_{s,y}$  is the survey depth, $Temp_{s,y}$ is the mean temperature (by survey depth) at each station for each survey, $SAL_{s,y}$ is the mean salinity (by survey depth) at each station for each survey, $Wind_{nw,y}$ is the proportional daily wind from the NW for each year, $Wind_{se,y}$ is the proportional daily wind from the SE for each year, $CP_y$ is the cold pool extent for that year, $Domain_s$ is a random effect of domain, this is based on the Ortiz regions delineated by oceanographic bounds. The error term, $\varepsilon_i$, is assumed to be multivariate normally distributed and $\sigma$ will be composed of a variance-covariance matrix that accounts for spatial autocorrelation, if necessary.
+ 
+```{r set up df_model}
+df_model <- df_summary %>% #create factors for year and domain
+  mutate(YEAR = as.factor(YEAR), 
+         DOMAIN = as.factor(DOMAIN),
+         summer.cold.pool.extent = as.factor(summer.cold.pool.extent)) %>%
+  filter(!is.na(TEMPERATURE))
+ 
+# convert lat long to distances
+x <- mapproject(df_model$LON, df_model$LAT, "albers", param=c(55.9, 60.8))
+df_model$x <- x$x
+df_model$y <- x$y
+```
+
+```{r Model: m1 year + temp}
+m1 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4), #s(YEAR, bs = 're', k=1),
+         data = df_model, method = "ML", family = Tweedie(p=1.84)) #estimated this p from a simple model using tw
+ 
+summary(m1)
+plot(m1)
+gam.check(m1)
+plot(df_model$sum,fitted(m1))
+
+rm(new.df)
+new.df <- data.frame(expand_grid(YEAR = factor(c("2014", "2015", "2016")),
+                     TEMPERATURE = seq(3,12, by=0.1)))
+
+# Note that you need to make the 'year' variable  a factor, to match the 
+# original data frame (EBS), othrewise 'predict' will not work. 
+# Compute and save predicted values and plot result:
+new.df$pred <- predict(m1, newdata=new.df)
+
+new.df %>%
+  ggplot(aes(TEMPERATURE,pred, group = YEAR, color = YEAR)) +
+  geom_line() +
+  geom_point(data = df_model, aes(TEMPERATURE,log(sum), group = YEAR, color = YEAR), alpha = 0.2)
+ 
+#plot(m1, scheme = 2, n = 200, tran = family(m)$linkinv)
+#plot(m1, shade=T, resid=T, pch=16)
+#family(m1) #check family and link function, this is log link. 
+ 
+  
+```
+
+```{r check spatial autocorr}
+# Examine residuals for autocorrelation. First, we can do a quick graphical 
+# exploration by plotting the residuals in space:
+spatial_df<-df_model
+#spatial component follow along with lab 12 document 
+# Estimate means of CPUE by year:
+mean_year <- gam(sum ~ YEAR, data=spatial_df, family = tw, method = "ML")
+summary(mean_year) #p=1.858
+mean_year$df.null
+
+# We should examine autocorrelation for one year at a time because the spatial 
+# autocorrelation, if present, should be evident within years only (because the 
+# fish may have a quite different spatial distributions between years):
+spatial_df$r <- resid(mean_year)   # Extract residuals
+coordinates(spatial_df) <- c("x","y")
+# Note that this creates a more complex object that includes the data frame as
+# a 'slot'. However, you can still use it like a data frame for most purposes.
+j <- spatial_df$YEAR == "2014"  # Extract 2010 data only
+bubble(spatial_df[j,], zcol="r")
+# Note strong spatial patterns of all positive and all negative correlations!
+
+# a 'slot'. However, you can still use it like a data frame for most purposes.
+k <- spatial_df$YEAR == "2015"  # Extract 2010 data only
+bubble(spatial_df[k,], zcol="r")
+
+# a 'slot'. However, you can still use it like a data frame for most purposes.
+l <- spatial_df$YEAR == "2016"  # Extract 2010 data only
+bubble(spatial_df[l,], zcol="r")
+
+
+j <- spatial_df$YEAR == "2014"   # Select year
+r <- resid(mean_year)[j] 
+d <- dist(coordinates(spatial_df)[j,])
+d  # Large (88x88) matrix of pairwise distances (values below diagonal only!)
+d <- as.vector(d)   # Need to convert to a vector for 'Variogram' function
+# The vector d, contains only one set of pairwise distances (values from below
+# the diagonal) and has length: n * (n-1) / 2, where n is the number of observations
+# (see help files for 'dist' and 'Variogram')
+
+# The 'Variogram' function from the 'nlme' package computes the semi-variogram,
+#  given a variable (residuals in this case) and the corresponding pairwise 
+#  distances 
+SemiVar <- Variogram(r, d)
+#plot(SemiVar, xlim=c(0,0.1)) # maybe dont plot so far this crashes the computer 
+
+bins <- cut(SemiVar$dist, seq(0,0.1, by=0.005))  
+plot(bins, SemiVar$variog) #looks like slight spatial autocorr, nothing too huge.
+```
+
+```{r Model: m2 year+temp+gaussian spatial}
+m2 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + s(x, y, bs='gp',m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+summary(m2)
+AIC(m1, m2) #including spatial component improves fit by a lot
+plot(m2)
+
+plot(df_model$sum,fitted(m2))
+
+b<-getViz(m2)
+o <- plot( sm(b, 1) )
+
+o + l_fitLine(colour = "red") + l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+listLayers(o)
+#plot(sm(b, 1)) + l_fitRaster() + l_fitContour() + l_points()
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+plot(b, select = 1) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+check(b,
+      a.qq = list(method = "tnorm", 
+                  a.cipoly = list(fill = "light blue")), 
+      a.respoi = list(size = 0.5), 
+      a.hist = list(bins = 10))
+
+#check spatial residuals
+ck1 <- check1D(b, "x")
+ck2 <- check1D(b, "y")
+gridPrint(ck1, ck2, ncol = 2)
+
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+```
+
+- adding wind vs adding year = exact same AIC.
+- pretty significant aic decrease with spatial gaussian
+
+```{r Model: m3 wind+temp+gaussian spatial}
+m3 <- gam(sum ~ SE.wind.May.Sep + NW.wind.May.Sep+ s(TEMPERATURE, k=4) + s(x, y, bs='gp',m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+summary(m3)
+AIC(m1, m2,m3) #including spatial component improves fit by a lot
+plot(m3)
+
+plot(df_model$sum,fitted(m2))
+
+b<-getViz(m3)
+o <- plot( sm(b, 1) )
+
+o + l_fitLine(colour = "red") + l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+listLayers(o)
+#plot(sm(b, 1)) + l_fitRaster() + l_fitContour() + l_points()
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+plot(b, select = 1) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+ck1 <- check1D(b, "x")
+ck2 <- check1D(b, "y")
+gridPrint(ck1, ck2, ncol = 2)
+
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+```
+
+# salinity and depth improve fit but are a minor addition
+# weirdness for the salinity and depth plots ... not sure why
+
+```{r Model: m4 year+temp+salinity+gaussian spatial}
+m4 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) +   s(SALINITY, k =4 )  +
+            s(x, y, bs='gp',m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+summary(m4)
+ plot(m4)
+
+plot(df_model$sum,fitted(m4))
+ 
+b<-getViz(m4)
+o <- plot( sm(b, 1) )
+
+o + l_fitLine(colour = "red") + l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+listLayers(o)
+#plot(sm(b, 1)) + l_fitRaster() + l_fitContour() + l_points()
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+plot(b, select = 1) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+ck1 <- check1D(b, "x")
+ck2 <- check1D(b, "y")
+gridPrint(ck1, ck2, ncol = 2)
+
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+```
+
+# m5 is the winner so far
+# need to predict values and check more goodness of fit? -- weirdness in depth predictor
+# compare the GP power to exponential and Matern covariance structures, see how they differ, also see if I can plot variogram for these other covariance structures.
+# in the r smoother for cov structure: order of m:between 1 and 5 selects the correlation function from respectively, spherical, power exponential, and Matern 
+# next need to look at plots for inspo, map a prediction/year, draw conclusions
+
+```{r function to plot predicted values}
+# To facilitate plotting the output for different models, it pays to
+# to write a quick function to do so:
+plot.calanus <- function(Model, Data=df_model) {
+  Model <- m5
+  # 'Model' should be a model with an appropriate 'predict' method
+  dat <- data.frame(expand_grid(YEAR = factor(c("2014", "2015", "2016")),
+                                SALINITY = seq(29, 32.8, by=0.5),
+                                MAX_GEAR_DEPTH = seq(12, 250, by=10),
+                                TEMPERATURE = seq(3,12, by=0.5),
+                                x = seq(min(df_model$x), max(df_model$x), by = 0.5),
+                                y = seq(min(df_model$x), max(df_model$x), by = 0.5)))
+
+  Fitted <- predict(Model, newdata=dat, se=T)
+  dat$mu <- exp(Fitted$fit)  # predicted values on response scale
+  dat$lower <-  exp(Fitted$fit - 1.96 * Fitted$se.fit)
+  dat$upper <-  exp(Fitted$fit + 1.96 * Fitted$se.fit)
+ 
+  
+  ggplot( ) +
+    geom_point(data = df_model, aes(x=sum, y = TEMPERATURE) ) +
+    facet_wrap(~YEAR)+
+    #geom_ribbon(data = dat, aes(x= mu, ymin = lower, ymax= upper)) +
+    geom_line(data = dat, aes(x=mu, y = TEMPERATURE))
+    
+}  
+
+```
+
+
+```{r Model: m5 year+temp+Gear_depth+gaussian spatial}
+ 
+m5 <- gam(sum ~ YEAR + s(TEMPERATURE, k=7 ) +  
+            #s(SALINITY, k =4 ) +# taking salinity out for now, it does slightly improve AIC, but I dont have a hypothesis around why salinity is important 
+            s(log(MAX_GEAR_DEPTH), k =5) +
+            s(x, y, bs='gp', m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+summary(m5)
+# 
+AIC(m1, m2,m3,m4,m5) #including spatial component improves fit by a lot
+b<-getViz(m5)
+
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+plot(m5)
+
+concurvity(m5) # to me this looks like salinity and max depth have high concurvity? 
+concurvity(m5, full = FALSE) #but it seems kind of unclear when I look at the pairwise
+
+#plot(df_model$sum,fitted(m5))
+gam.check(m5)
+
+b<-getViz(m5)
+
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+o <- plot( sm(b, 1) )
+
+o + l_fitLine(colour = "red") + l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+listLayers(o)
+#plot(sm(b, 1)) + l_fitRaster() + l_fitContour() + l_points()
+ 
+plot(b, select = 1) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+plot(b, select = 3) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+ck1 <- check1D(b, "x")
+ck2 <- check1D(b, "y")
+gridPrint(ck1, ck2, ncol = 2)
+
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+b <- getViz(b, nsim = 50)
+gridPrint(check1D(b, "x") + l_gridCheck1D(gridFun = sd, showReps = TRUE), 
+          check1D(b, "y") + l_gridCheck1D(gridFun = sd, showReps = TRUE), ncol = 2)
+
+######resdiuals from franz scripts
+plot(df_model$YEAR, resid(m5), type="b"); abline(h=0, col=4)
+plot(df_model$TEMPERATURE, resid(m5), type="b"); abline(h=0, col=4)
+
+plot(m5, residuals = TRUE, pch = 1, cex = 1)
+
+plot(m5, pages = 1, all.terms = TRUE)
+
+plot(m5, select = 1, shade = TRUE, shade.col = "hotpink", 
+     shift = coef(m5)[1], seWithMean = TRUE)
+
+plot(m5, select = 2, shade = TRUE, shade.col = "hotpink", 
+     shift = coef(m5)[2], seWithMean = TRUE)
+
+plot(m5, scheme = 1, pages = 1)
+ 
+#visualize spatial uncertainty
+vis.gam(m5, view = c("x", "y"), 
+        plot.type = "persp", se = 2)
+#rotate
+vis.gam(m5, view = c("x", "y"),
+        plot.type = "persp", se = 2, theta = 135)
+#plot map
+# Make plot with 5% extrapolation
+vis.gam(m5, view = c("x", "y"), 
+        plot.type = "contour", too.far = 0.05)
+
+# Overlay data
+points(df_model$x,df_model$y)
+
+vis.gam(m5, view = c("x", "y"), 
+        plot.type = "contour", too.far = 0.15)
+
+# Overlay data
+points(df_model$x,df_model$y)
+
+##################################
+#try and predict... 
+df_2014<- df_model %>% 
+  filter(YEAR == 2014)
+
+df<-data.frame(x = seq(from=min(df_2014$x), 
+              to=max(df_2014$x),
+              length.out = 424),
+  y = seq(from=min(df_2014$y),
+              to=max(df_2014$y),
+              length.out = 424))
+
+pred_2014<- df_model %>% 
+  filter(YEAR == 2014) %>%
+  ungroup() %>%
+  dplyr::select(YEAR,TEMPERATURE,MAX_GEAR_DEPTH, LAT, LON, x,y) #%>%
+  #cbind(df)
+
+# pred_2014 <- expand_grid(
+#    YEAR = rep("2014"),
+#    TEMPERATURE = seq(from=min(df_2014$TEMPERATURE), 
+#               to=max(df_2014$TEMPERATURE), 
+#               length.out = 20),
+#     MAX_GEAR_DEPTH = seq(from=min(df_2014$MAX_GEAR_DEPTH), 
+#               to=max(df_2014$MAX_GEAR_DEPTH), 
+#               length.out = 20),
+#   x = seq(from=min(df_2014$x), 
+#               to=max(df_2014$x), 
+#               length.out = 50),
+#   y = seq(from=min(df_2014$y), 
+#               to=max(df_2014$y), 
+#               length.out = 50))
+
+ pred2014_df <- predict(m5, newdata =  pred_2014, 
+                      se.fit = TRUE) %>%  
+  as_tibble() %>% 
+  cbind(pred_2014)
+ 
+#convert x y back to lat/lon for plotting? 
+# x <- mapproject(df_model$LON, df_model$LAT, "albers", param=c(55.9, 60.8))
+#   df_model$x <- x$x
+#   df_model$y <- x$y
+   
+ ggplot(pred2014_df, aes(x=x, y=y, fill =  fill)) + 
+  #geom_hex(aes(fill = fit, color = fit)) 
+  stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE)  
+
+  ggplot(pred2014_df) + 
+    geom_point(aes(x=fit,  y = TEMPERATURE))
+
+```
+
+# Gear depth offers more than bottom depth...
+
+```{r Model: m6 year+temp+salinity+bottom_depth+gaussian spatial power}
+m6 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) +  
+            s(SALINITY, k=4 ) + 
+            s(BOTTOM_DEPTH, k =4) +
+            s(x, y, bs='gp',m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+summary(m6)
+AIC(m1, m2,m3,m4,m5,m6) #including spatial component improves fit by a lot
+
+plot(m5)
+
+plot(df_model$sum,fitted(m5))
+ 
+b<-getViz(m5)
+o <- plot( sm(b, 1) )
+
+o + l_fitLine(colour = "red") + l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+listLayers(o)
+#plot(sm(b, 1)) + l_fitRaster() + l_fitContour() + l_points()
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+plot(b, select = 1) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+plot(b, select = 3) + l_dens(type = "cond") + l_fitLine() + l_ciLine()
+
+ck1 <- check1D(b, "x")
+ck2 <- check1D(b, "y")
+gridPrint(ck1, ck2, ncol = 2)
+
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+b <- getViz(b, nsim = 50)
+gridPrint(check1D(b, "x") + l_gridCheck1D(gridFun = sd, showReps = TRUE), 
+          check1D(b, "y") + l_gridCheck1D(gridFun = sd, showReps = TRUE), ncol = 2)
+```
+
+```{r Model: m7 year+temp+Gear_depth+gaussian spatial exponential}
+m7 <- gam(sum ~ YEAR + s(TEMPERATURE, k=7 ) +  
+            #s(SALINITY, k =4 ) +# taking salinity out for now, it does slightly improve AIC, but I dont have a hypothesis around why salinity is important 
+            s(log(MAX_GEAR_DEPTH), k =5) +
+            s(x, y, bs='gp', m=3), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+summary(m7)
+
+AIC(m1, m2,m3,m4,m5,m7) #including spatial component improves fit by a lot
+b<-getViz(m7)
+
+print(plot(b, allTerms = T), pages = 1) # Calls print.plotGam()
+
+m7
+```
+ 
+```{r Model: m8 year+year_random_effect+temp+Gear_depth+gaussian spatial}
+m8 <- gam(sum ~ YEAR + s(YEAR, bs="re") + s(TEMPERATURE, k=7 ) +  
+            #s(SALINITY, k =4 ) +# taking salinity out for now, it does slightly improve AIC, but I dont have a hypothesis around why salinity is important 
+            s(log(MAX_GEAR_DEPTH), k =5) +
+            s(x, y, bs='gp', m=2), 
+         data = df_model, method = "ML", family = Tweedie(p=1.84))
+
+```
+ 
+## Acknowledgements
+Thank you to Courtney Weiss and Molly Payne for providing comments. Thank you to Dave Kimmel for providing data and for reviewing ideas with me during the project. 
+
+## References
+- Baumgartner, M. F., Lysiak, N. S., Esch, H. C., Zerbini, A. N., Berchok, C. L., & Clapham, P. J. (2013). Associations between North Pacific right whales and their zooplanktonic prey in the southeastern Bering Sea. Marine Ecology Progress Series, 490, 267-284.
+- Cheung, W.W.L., T.L. Frölicher (2020) Marine heatwaves exacerbate climate change impacts for fisheries in the northeast Pacific. Sci Rep 10, 6678 https://doi.org/10.1038/s41598-020-63650-z
+- Danielson, S., Hedstrom, K., Aagaard, K., Weingartner, T., & Curchitser, E. (2012). Wind-induced reorganization of the Bering shelf circulation. Geophysical Research Letters, 39(8), L08601. https://doi.org/10.1029/2012gl051231
+- Fisher, M.C., S.K. Moore, S.L. Jardine, J.R. Watson, & J.F. Samhouri (2021) Climate shock effects and mediation in fisheries. Proceedings of the National Academy of Sciences 118, no. 2.
+- Frölicher, T.L., E.M. Fischer, & N Gruber. (2020) Marine heatwaves under global warming." Nature 560.7718 (2018): 360-364.
+- Hansen, B. B., Grøtan, V., Herfindal, I., & Lee, A. M. (2020) The Moran effect revisited: spatial population synchrony under global warming. Ecography, 43(11), 1591-1602.
+- Siddon, E.C., T. Kristiansen, F.J. Mueter, K.K. Holsman, R.A. Heintz, and E.V. Farley. (2013) Spatial match-mismatch between juvenile fish and prey provides a mechanism for recruitment variability across contrasting climate conditions in the eastern Bering Sea. PLoS One 8, no. 12 (2013): e84526.
+- Springer, A. M., Roseneau, D. G., Lloyd, D. S., McRoy, C. P., & Murphy, E. C. (1986). Seabird responses to fluctuating prey availability in the eastern Bering Sea. Marine Ecology Progress Series, 1-12.

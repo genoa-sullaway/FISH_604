@@ -4,3 +4,17 @@
 .Ruserdata
 .ppsx
 class_pdfs_slides
+*.pdf
+data/ortiz_regions/BSIERP_regions_2012.dbf
+data/ortiz_regions/BSIERP_regions_2012.prj
+data/ortiz_regions/BSIERP_regions_2012.sbn
+data/ortiz_regions/BSIERP_regions_2012.sbx
+data/ortiz_regions/BSIERP_regions_2012.shp
+data/ortiz_regions/BSIERP_regions_2012.shp.xml
+data/Nenana fish.csv
+data/Global temperatures1880-2020.csv
+data/Global temperatures.csv
+data/ortiz_regions/BSIERP_regions_2012.shx
+data/ortiz_regions/BSIERP_regions_2012_metadata.xml
+data/pinks.csv
+*.csv
