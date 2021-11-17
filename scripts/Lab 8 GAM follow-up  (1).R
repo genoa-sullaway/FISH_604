@@ -14,7 +14,7 @@
 
 
 # Import and examine data:
-Nenana <- read.csv("Nenana fish.csv")
+Nenana <- read.csv("data/Nenana fish.csv")
 head(Nenana)
 # Convert dates to Julian day for plotting and modeling 
 Nenana$Julian <- strptime(Nenana$Date,"%m/%d/%Y")$yday

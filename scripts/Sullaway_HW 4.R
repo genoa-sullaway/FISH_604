@@ -1,6 +1,6 @@
 ##################################################################################
 
-# Homework 4 template
+# SULLAWAY HWK 4
 
 # Assignment: Based on the formulas given in the instructions, compute the model-
 #           averaged estimate and the variance of the intercept of the Ricker model
@@ -39,7 +39,7 @@ theta_hat<- intercepts_df %>%
         mutate(theta = `(Intercept)`* W.aicc) %>%
         summarise(sum = sum(theta))
 
-#####ANSWER: 
+#####ANSWER: Model averaged estimate for theta is 1.1. 
 theta_hat
 ###############################################################################
 ### Problem 2:
@@ -53,17 +53,16 @@ theta_hat
  }
  
 # Compute model-averaged variance / standard error (Equation 2)
-# ********** CHECK FORMULA!! output seems very small 
  var_df<- unlist(var) %>%
    data.frame() %>%
    rename(variance = ".") %>%
    cbind(intercepts_df) %>%
    cbind(W.aicc) %>%
-   mutate(var_theta = W.aicc*(sqrt(variance + ((`(Intercept)`- theta_hat)^2)))) %>%
-   summarise(sum = (sum(var_theta)^2))
-sqrt(var_df)
-
-#####ANSWER: 
+   mutate(theta_hat = theta_hat) %>%
+   dplyr::mutate(var_theta =  W.aicc*(sqrt(variance + (`(Intercept)`-theta_hat)^2))) %>% 
+   dplyr::summarise(sum = (sum(var_theta)^2))
+ 
+#####ANSWER: Model averaged variance is 0.02
 var_df
 
 ###############################################################################
@@ -73,8 +72,7 @@ library(AICcmodavg)
  Modnames <- names(Branch.fits)
  output<-modavg(parm = "(Intercept)", cand.set = Branch.fits, modnames = Modnames)
  
-# I got 1.09 when I did the parameter averaging by hand and I got 1.1 uusing modavg, 
-# I imagine the package rounded up so we got pretty much the same answer
+# I got 1.09 (rounds up to 1.1) when I did the parameter averaging by hand and I got 1.1 using modavg
 
 #Do comparison it using model.avg
 library(MuMIn)
@@ -87,14 +85,17 @@ model.avg(Branch.fits)
 ### Problem 4:
 
 # 95% confidence interval computed "by hand"
-
 lower <- theta_hat - 1.96*sqrt(var_df) 
 upper <- theta_hat + 1.96*sqrt(var_df) 
+
+## ANSWER: 95% CI by hand: 0.8170338, 1.380605
 
 
 # 95% confidence interval as computed by 'modavg'
 output$Lower.CL 
 output$Upper.CL
+
+#ANSWER: 95% CI with  modavg is (0.8163925, 1.381246)
 
 ###############################################################################
 ### Problem 5:
@@ -105,12 +106,12 @@ output_lag3<-modavg(parm = "SST.t3", cand.set = Branch.fits[c(1,2,3,4)], modname
 
 #####ANSWER:
 # Model averaging indicates that 95% of the time, the mean estimate for SST lag 2 will be between 0.11 and 0.65, modeling averaging returns and estimate of 0.38. The standard error is 0.14.  
-# Model averaging indicates that 95% of the time, the mean estimate for SST lag 2 will be between -0.48 and 1.17, modeling averaging returns and estimate of 0.35. The standard error is 0.42. 
+# Model averaging indicates that 95% of the time, the mean estimate for SST lag 3 will be between -0.48 and 1.17, modeling averaging returns and estimate of 0.35. The standard error is 0.42. 
  
 # What can you conclude about the effects of SST on the recruitment of 
 # Branch River sockeye salmon?
 
 #####ANSWER:
-# We can conclude that lag 2 SST has a significant positive relationship with recruitment of Branch river sockeye salmon. However, SST lag 3 is not as an important of a
-# predictor because the confidence interval crosses 0. 
+# We can conclude that SST time lagged by 2 years is important in predicting Branch river sockeye recruitment and we see a positive relationship between SST-lag 2 and recruitment.  
+# However, SST lag 3 is not as an important of a predictor in recruitment because the confidence interval crosses 0. 
 

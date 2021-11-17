@@ -51,23 +51,23 @@ Branch$logRS <- log(Branch$R / Branch$S)
 ### Step 2: Examine predictor variables (check for multi-collinearity, examine for trends):
 # Here's a different option for a pairwise scatterplot using ggplot2/GGoby:
 # a bit slower than the others!)
-ggpairs(Branch[,c(9,2,4:7)], lower=list(continuous='smooth'))
-# Table of pairwise correlations:
-cor(Branch[,c(9, 2,4:7)])
+# ggpairs(Branch[,c(9,2,4:7)], lower=list(continuous='smooth'))
+# # Table of pairwise correlations:
+# cor(Branch[,c(9, 2,4:7)])
 # No evidence of substantial collinearity! The largest correlation between
 # explanatory variables is that between the PDO at two lags (0.37). 
-
-win.graph(4,7)   # use 'quartz' on Mac OS
-par(mfrow=c(4,1), omi=c(0.3,0,0.1,0), mar = c(0,4.5,0,1))
-plot(SST.t2 ~ Year, data=Branch, type="b", xaxt="n", 
-     ylab = "SST, lag 2", cex.lab = 1.6)
-plot(SST.t3 ~ Year, data=Branch, type="b", xaxt="n", 
-     ylab = "SST, lag 3", cex.lab = 1.6)
-plot(PDO.t2 ~ Year, data=Branch, type="b", xaxt="n", 
-     ylab = "PDO, lag 2", cex.lab = 1.6)
-plot(PDO.t3 ~ Year, data=Branch, type="b", xaxt="n", 
-     ylab = "PDO, lag 3", cex.lab = 1.6)
-axis(1, cex.axis=1.5)
+# 
+# win.graph(4,7)   # use 'quartz' on Mac OS
+# par(mfrow=c(4,1), omi=c(0.3,0,0.1,0), mar = c(0,4.5,0,1))
+# plot(SST.t2 ~ Year, data=Branch, type="b", xaxt="n", 
+#      ylab = "SST, lag 2", cex.lab = 1.6)
+# plot(SST.t3 ~ Year, data=Branch, type="b", xaxt="n", 
+#      ylab = "SST, lag 3", cex.lab = 1.6)
+# plot(PDO.t2 ~ Year, data=Branch, type="b", xaxt="n", 
+#      ylab = "PDO, lag 2", cex.lab = 1.6)
+# plot(PDO.t3 ~ Year, data=Branch, type="b", xaxt="n", 
+#      ylab = "PDO, lag 3", cex.lab = 1.6)
+# axis(1, cex.axis=1.5)
 # There are considerable fluctuations in temperature and the
 # PDO and a period of positive PDO values after the mid-60s.
 # The lagged time series are of course identical, just shifted
@@ -164,11 +164,11 @@ summary(update(Branch.fits$A, subset = -5), cor=F)
 
 ## Plot resiuals against covariates and over time to check for patterns:
 r <- rstandard(Branch.fits$A)  # Standardized residuals
-par(mfrow=c(2,2), mar=c(4,2,1,1))
-plot(Branch$SST.t2, r, xlab="SST"); abline(h=0, lty=2)
-plot(Branch$PDO.t2, r, xlab="PDO"); abline(h=0, lty=2)
-plot(Branch$S, r, xlab="Spawners"); abline(h=0, lty=2)
-plot(Branch$Year, r, xlab="Year", type="b"); abline(h=0, lty=2)
+# par(mfrow=c(2,2), mar=c(4,2,1,1))
+# plot(Branch$SST.t2, r, xlab="SST"); abline(h=0, lty=2)
+# plot(Branch$PDO.t2, r, xlab="PDO"); abline(h=0, lty=2)
+# plot(Branch$S, r, xlab="Spawners"); abline(h=0, lty=2)
+# plot(Branch$Year, r, xlab="Year", type="b"); abline(h=0, lty=2)
 # Plot of residuals against spawners shows high leverage point (S > 1200)
 # Plot of residuals over time shows some evidence of autocorrelation (runs 
 #  of positive and negative residuals)

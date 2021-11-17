@@ -9,7 +9,7 @@
 
 
 ################### LOWESS smooth - choose 'span':
-GAK1 <- read.csv("GAK1_mod.csv")
+GAK1 <- read.csv("data/GAK1_mod.csv")
 str(GAK1)
 GAK1$year  # Note that year is in decimal format!
 

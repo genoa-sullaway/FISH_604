@@ -1,8 +1,5 @@
 #create full data frame for stats project- then saves data frame, so probbaly dont need to run it again. 
 
-# library(ncdf4)
-# library(ncdf4.helpers)
-# library(PCICt)
 library(here)
 library(tidyverse)
 library(sf)
@@ -11,20 +8,17 @@ library(raster)
 
 ##############################################################################################
 #load data
-full_calanus <- read_csv("data/Calanus_data_14-16.csv")
-
-#get list of unique cruises so you  can bring in temperature data 
-#cruise_list <- unique(full_calanus$CRUISE)
-
+full_calanus <- read_csv("data/Calanus_data_14-19.csv")
+# cruise_list <- data.frame(unique(full_calanus$CRUISE))
+# View(cruise_list)
 ##############################################################################################
 #load SST and salinity data
 #source("scripts/load_seacat_abiotic_data.csv")
 SST_SAL_complete<-read_csv("data/SST_SAL_complete.csv")
 
-later<-full_calanus %>%
-  filter(YEAR > 2016)
-
-unique(later$CRUISE)
+# later<-full_calanus %>%
+#   filter(YEAR > 2016)
+# unique(later$CRUISE)
 
 ##############################################################################################
 #create base map
@@ -55,7 +49,7 @@ ortiz_shp <- st_transform(ortiz_shp, "+proj=longlat +ellps=WGS84 +datum=WGS84 +n
 #load data and compile into one df
 #load climate  data from Litzlow -- Wind etc.  
 climate_data <- read_csv("data/climate_data.csv") %>%
-  filter(year %in% c(2014, 2015,2016)) %>%
+  filter(year %in% c(2014, 2015,2016,2018)) %>%
   dplyr::select(year,AO.jfm,SE.wind.Oct.Apr, NW.wind.Oct.Apr, SE.wind.May.Sep, NW.wind.May.Sep,
                 summer.cold.pool.extent, ice.area.jfma, north.wind.stress.amj,south.wind.stress.amj) %>%
   dplyr::rename(YEAR = "year")

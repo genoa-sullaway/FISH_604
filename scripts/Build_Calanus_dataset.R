@@ -265,7 +265,9 @@ zoop_complete <- left_join(Master, zoop_grouped) %>%
   filter(!LAT >65, !LON > -154) # do rough spatial filter, will need to do this better later, mostly removing stuff in GOA
 
 calanus <- zoop_complete %>%
-  filter(TAXON_NAME %in% c("Calanus marshallae", "Calanus pacificus", "Calanus glacialis")) %>%
+  filter(TAXON_NAME %in% c("Calanus marshallae", "Calanus pacificus", "Calanus glacialis", 
+                           "Pseudocalanus spp.",
+                           "Neocalanus spp.")) %>%
   filter(!YEAR < 2013)
 
 #add on domain----
@@ -289,4 +291,4 @@ df_filtered<-df_contains %>%
   filter(!name == "AK peninsula") %>%
   left_join(calanus) 
  
-#write_csv(df_filtered, "data/Calanus_data_14-16.csv")
+#write_csv(df_filtered, "data/Calanus_data_14-19.csv")
