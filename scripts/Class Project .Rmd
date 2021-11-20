@@ -61,6 +61,9 @@ bounds_ak <- extent(-176,-156,54,65 )
 extent_ak <- st_set_crs(st_as_sf(as(bounds_ak, "SpatialPolygons")), 4326)
 ak <- st_intersection(ak, extent_ak) #trim map by intersections 
  #plot(ak)
+# EPSG = 5070
+ak_albers<- st_transform(ak,5070) #change to albers projection
+plot(ak_albers)
  
 #load shape file with ortiz shapes 
 ortiz_shp <- st_read("data/ortiz_regions/BSIERP_regions_2012.shp")
