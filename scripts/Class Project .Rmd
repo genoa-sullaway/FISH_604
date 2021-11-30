@@ -11,6 +11,7 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 library(here)
 library(tidyverse)
+library(lubridate)
 library(sf)
 library(maps)
 library(viridis)
@@ -22,30 +23,43 @@ library(sp)
 library(mgcv)
 library(GGally)
 library(viridis) 
-library(gratia)
-library(mgcViz) #helpful for model plotting and checking:: https://cran.r-project.org/web/packages/mgcViz/vignettes/mgcviz.html
+library(mapproj)
+library(mgcViz) #helpful for model plotting and checking::
+library(ggpubr)
+#https://cran.r-project.org/web/packages/mgcViz/vignettes/mgcviz.html
 #library(kableExtra)
 theme_set(theme_classic())
-
+#install.packages('terra', repos='https://rspatial.r-universe.dev')
 ```
 
 ```{r LOAD DATA}
 #load data that was created by : final_DF_EDA_StatsProj.R
 df <- read_csv(here("data","fulldata_stats_proj.csv"))  %>%
   filter(YEAR %in% c(2014, 2015, 2016, 2018)) %>%
-   filter(!is.na(TEMPERATURE)) 
+   filter(!is.na(TEMPERATURE)) %>%
+   mutate(MONTH = str_pad(MONTH, 2, pad = "0"),
+         DAY = str_pad(DAY, 2, pad = "0")) %>%
+   tidyr::unite(col = "date", c("YEAR", "MONTH", "DAY"), remove = FALSE, sep = "/")  %>%
+  mutate(date = as.Date(date, "%Y/%m/%d"),
+         julian = yday(date))
+  
 
 df_summary<- df %>% 
   mutate(TAXON_NAME = case_when(TAXON_NAME %in% c("Calanus marshallae", "Calanus pacificus", "Calanus glacialis") ~ "Calanus spp",
                                 TRUE ~ TAXON_NAME)) %>%
-  group_by(YEAR, LAT, LON, TEMPERATURE, SALINITY, DOMAIN, MAX_GEAR_DEPTH, BOTTOM_DEPTH,TAXON_NAME, SE.wind.May.Sep, NW.wind.May.Sep, summer.cold.pool.extent) %>%
+  group_by(YEAR, MONTH, julian,LAT, LON, TEMPERATURE, SALINITY, DOMAIN, MAX_GEAR_DEPTH, BOTTOM_DEPTH,TAXON_NAME, summer.cold.pool.extent) %>%
   dplyr::summarise(sum = sum(EST_NUM_PERM3))
 
-climate_data <- read_csv("data/climate_data.csv") %>%
-  filter(year %in% c(2014, 2015,2016,2018)) %>%
-  dplyr::select(year, summer.cold.pool.extent)  
-
-summer_CP <- data.frame(unique(climate_data[c("year", "summer.cold.pool.extent")]))
+#convert from lat long to x y albers. 
+x <- mapproject(df_summary$LON, df_summary$LAT, "albers", param=c(55.9, 60.8))
+df_summary$x <- x$x #LON
+df_summary$y <- x$y #LAT 
+ 
+# climate_data <- read_csv("data/climate_data.csv") %>%
+#   filter(year %in% c(2014, 2015,2016,2018)) %>%
+#   dplyr::select(year, summer.cold.pool.extent)  
+# 
+# summer_CP <- data.frame(unique(climate_data[c("year", "summer.cold.pool.extent")]))
 ```
 
 ```{r create base maps shape file,include=FALSE}
@@ -56,15 +70,15 @@ ak <- sf::st_as_sf(maps::map('world','USA:Alaska',
                              plot=FALSE, fill=TRUE))
 
 #create bounds to trim AK map 
-bounds_ak <- extent(-176,-156,54,65 )
+bounds_ak <- extent(-176,-156,54,65)
 #bounds_ak <- extent(-164.5,-160, 55,60) 
 extent_ak <- st_set_crs(st_as_sf(as(bounds_ak, "SpatialPolygons")), 4326)
 ak <- st_intersection(ak, extent_ak) #trim map by intersections 
- #plot(ak)
+ plot(ak)
 # EPSG = 5070
 ak_albers<- st_transform(ak,5070) #change to albers projection
 plot(ak_albers)
- 
+ m
 #load shape file with ortiz shapes 
 ortiz_shp <- st_read("data/ortiz_regions/BSIERP_regions_2012.shp")
 ortiz_shp <- subset(ortiz_shp, !DOMAIN == 15)
@@ -157,33 +171,48 @@ temperature <- df %>%
    mutate(variable = "Temperature C (Min, Max)") %>%
    slice(1)
 
-wind.nw <- df %>%
-  dplyr::summarise(Min_NW_Wind = round(min(NW.wind.May.Sep,  na.rm = T), digits = 2),
-            Max_NW_Wind =  round(max(NW.wind.May.Sep, na.rm = T), digits = 2)) %>%
-   gather(1:2, key = "variable", value = "value") %>%
-   mutate(value = paste(value, collapse=" - ")) %>%
-   mutate(variable = "Propotion Daily NW Wind (Min, Max)") %>%
-   slice(1)
+# wind.nw <- df %>%
+#   dplyr::summarise(Min_NW_Wind = round(min(NW.wind.May.Sep,  na.rm = T), digits = 2),
+#             Max_NW_Wind =  round(max(NW.wind.May.Sep, na.rm = T), digits = 2)) %>%
+#    gather(1:2, key = "variable", value = "value") %>%
+#    mutate(value = paste(value, collapse=" - ")) %>%
+#    mutate(variable = "Propotion Daily NW Wind (Min, Max)") %>%
+#    slice(1)
 
-wind.se <- df %>%
-  dplyr::summarise(Min_SE_Wind = round(min( SE.wind.May.Sep,  na.rm = T), digits = 2),
-            Max_SE_Wind = round(max(SE.wind.May.Sep, na.rm = T), digits = 2)) %>%
-   gather(1:2, key = "variable", value = "value") %>%
-   mutate(value = paste(value, collapse=" - ")) %>%
-   mutate(variable = "Proportion Daily SE Wind (Min, Max)") %>%
-   slice(1)
+# wind.se <- df %>%
+#   dplyr::summarise(Min_SE_Wind = round(min( SE.wind.May.Sep,  na.rm = T), digits = 2),
+#             Max_SE_Wind = round(max(SE.wind.May.Sep, na.rm = T), digits = 2)) %>%
+#    gather(1:2, key = "variable", value = "value") %>%
+#    mutate(value = paste(value, collapse=" - ")) %>%
+#    mutate(variable = "Proportion Daily SE Wind (Min, Max)") %>%
+#    slice(1)
 
-coldpool <- df %>%
-  dplyr::summarise(Min_Cold_Pool = round(min(summer.cold.pool.extent,  na.rm = T)),
-            Max_Cold_Pool = round(max(summer.cold.pool.extent, na.rm = T))) %>%
-   gather(1:2, key = "variable", value = "value") %>%
-   mutate(value = paste(value, collapse=" - ")) %>%
-   mutate(variable = "Summer Cold Pool Extent km (Min, Max)") %>%
-   slice(1)
+# coldpool <- df %>%
+#   dplyr::summarise(Min_Cold_Pool = round(min(summer.cold.pool.extent,  na.rm = T)),
+#             Max_Cold_Pool = round(max(summer.cold.pool.extent, na.rm = T))) %>%
+#    gather(1:2, key = "variable", value = "value") %>%
+#    mutate(value = paste(value, collapse=" - ")) %>%
+#    mutate(variable = "Summer Cold Pool Extent km (Min, Max)") %>%
+#    slice(1)
  
- table <-rbind(station_year, depth, gear, salinity,temperature,wind.se,wind.nw,coldpool) %>%
+ table <-rbind(station_year, depth, gear, salinity,temperature#,wind.se,wind.nw,coldpool
+               ) %>%
   dplyr::rename(Variable = "variable", Value = "value")
 
+# Generally, the table and figures show the key features of the data. One improvement would be to list means and ranges of sampling dates and covariates by year (3 columns for 2014,15,16)
+ 
+table_summ <- df_model %>%
+  filter(TAXON_NAME %in% c("Calanus spp", "Pseudocalanus spp")) %>%
+  group_by(TAXON_NAME, YEAR,MONTH ) %>%
+  summarise( mean = mean(sum))
+
+table_summ2 <- df_model %>%
+  filter(TAXON_NAME %in% c("Calanus spp", "Pseudocalanus spp.")) %>%
+  group_by(TAXON_NAME, YEAR ) %>%
+  summarise( mean = mean(sum),
+             mean_temp = mean(TEMPERATURE),
+             Min_Temp = round(min( TEMPERATURE,  na.rm = T)),
+            Max_Temp = round(max(TEMPERATURE, na.rm = T)))
 ```
 
 \n
@@ -191,14 +220,13 @@ Is there multicolinearity??
 - I think this plot says yes... esp with salinity and temperature, also salinity and depth
 
 ```{r covariate}
-df <- df_model %>%
+df <- df_summary %>%
   filter(!SALINITY < 29)
-ggpairs(df[,c("sum", "TEMPERATURE", "SALINITY", "MAX_GEAR_DEPTH")], lower=list(continuous='smooth')) #est num, salinity, temp, depth
+ggpairs(df[,c("sum", "TEMPERATURE", "MAX_GEAR_DEPTH")], lower=list(continuous='smooth')) #est num, salinity, temp, depth
  
 #wind: ,31:32
 
 #coldpool -- 33 
-
 
 ggplot(df_model,aes(x=log(sum), y = TEMPERATURE)) +
   geom_point( ) +
@@ -259,10 +287,10 @@ cal_point_map<-ggplot(ak) +
   geom_point(data = df_summary %>% filter(TAXON_NAME == "Calanus spp"), aes(x=LON, y=LAT, color = log(sum))) + #, size = EST_NUM_PERM3))+
   theme_classic() +
   scale_color_viridis() +
-  labs(color= "Log(CPUE)")  +
+  labs(color= "C. marshallae Log(CPUE)")  +
   #scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
   #guides(color=guide_legend(title="Log(CPUE)")) + 
-  theme( strip.text = element_text(size =12),
+  theme(strip.text = element_text(size =12),
        # legend.key.size = unit(2, 'cm'),
         legend.position = "bottom", 
         #legend.text=element_text(size=15),
@@ -278,19 +306,20 @@ cal_point_map<-ggplot(ak) +
  # labs(caption = "Figure 1. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the log CPUE for calanus marshallae for each station in each  year")
 
 cal_point_map
+
 ps_point_map<-ggplot(ak) +
   geom_sf() +
   geom_point(data = df_summary %>% filter(TAXON_NAME == "Pseudocalanus spp."), aes(x=LON, y=LAT, color = log(sum))) + #, size = EST_NUM_PERM3))+
   theme_classic() +
   scale_color_viridis() +
-  labs(color= "Log(CPUE)")  +
+  labs(color= "Pseudocalanus spp Log(CPUE)")  +
   #scale_color_gradient(low = "#de9b71", high = "#5d74a5", name = "Log C. marshallae CPUE") +
   #guides(color=guide_legend(title="Log(CPUE)")) + 
-  theme( strip.text = element_text(size =12),
-        legend.key.size = unit(2, 'cm'),
+   theme(strip.text = element_text(size =12),
+       # legend.key.size = unit(2, 'cm'),
         legend.position = "bottom", 
-        legend.text=element_text(size=15),
-        legend.title = element_text(size=15),
+        #legend.text=element_text(size=15),
+       # legend.title = element_text(size=15),
         plot.caption = element_text(hjust = 0, size =10),
         axis.title.y=element_blank(),
         axis.text.y=element_blank(),
@@ -331,12 +360,44 @@ temperature
 
 \n
 
-```{r plot coplot depth SST and salinity, fig.cap="Figure 3. Relationship between some covariates used in the analysis, \n temperature, salinity, maximum gear depth and year from\n stations where zooplankton were surveyed" }
-#remove one salinity outlier 
-df_no_sal <- df %>%
-  filter(!SALINITY<23 )
+```{r PLOT julian day, out.width='\\textwidth',fig.align='center', fig.width=18, fig.height=8}
+julian_day<- ggplot(ak) +
+  geom_sf() +
+  geom_point(data = df, aes(x=LON, y=LAT, color = julian)) + #, size = EST_NUM_PERM3))+
+  theme_classic() +
+  scale_color_gradient(low = "blue", high = "red", name = "Julian day") +
+  labs(color= "Julian day")  +
+  theme(  strip.text = element_text(size =12),
+        legend.key.size = unit(2, 'cm'),
+        legend.position = "bottom",    
+        plot.caption = element_text(hjust = 0, size =10),
+        legend.title = element_text(size=15),
+        legend.text=element_text(size=15),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  facet_wrap(~YEAR) #+
+#  labs(caption = "Figure 2. A point indicates a station where a survey was conducted,\n each facet represents a year, color indicates the mean temperature at each station in each  year")
+julian_day
+```
 
-coplot(SALINITY~TEMPERATURE|MAX_GEAR_DEPTH * as.factor(YEAR), data = df_no_sal, number=c(4,3))
+```{r julian day and temperature scatter plot}
+
+ggplot(data = df) +
+  geom_point(aes(x=julian, y = TEMPERATURE)) + 
+  facet_wrap(~YEAR)
+
+```
+
+```{r plot coplot, fig.cap="Figure 3. Relationship between some covariates used in the analysis, \n temperature, salinity, maximum gear depth and year from\n stations where zooplankton were surveyed" }
+#remove one salinity outlier 
+# df_no_sal <- df %>%
+#   filter(!SALINITY<23 )
+
+coplot(TEMPERATURE~julian|LAT * as.factor(YEAR), data = df_calanus, number=c(4,3))
 mysubtitle = "Figure 3. Coplot demonstrating the\nrelationship between temperature (C), \nsalnity (ppm), maximum gear depth (m) and year from\n stations where zooplankton were surveyed"
 mtext(side=3, line= -28, at=-0.2, adj=0, cex=0.7, mysubtitle)
 
@@ -353,28 +414,28 @@ df_summary %>%
   ylab("Count") 
 
   #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
-
-test<- df_summary %>% 
-  filter(sum == 0) %>%
-  summarise(count(nrow()))
-
-test<- df_summary %>% 
-  filter(sum > 0) %>%
-  filter(sum<1) %>%
-  summarise(count(nrow()))
-
-test <- df_summary %>%
-  filter(!EST_NUM_PERM3 ==0) %>%
-  ggplot() +
-  geom_histogram(aes(EST_NUM_PERM3))+
-  xlab("Log CPUE") +
-  ylab("Count") 
-
-df_nozero %>%
-  ggplot() +
-  geom_histogram(aes(log(sum))) + 
-  xlab("Log CPUE") +
-  ylab("Count") 
+# 
+# test<- df_summary %>% 
+#   filter(sum == 0) %>%
+#   summarise(count(nrow()))
+# 
+# test<- df_summary %>% 
+#   filter(sum > 0) %>%
+#   filter(sum<1) %>%
+#   summarise(count(nrow()))
+# 
+# test <- df_summary %>%
+#   filter(!EST_NUM_PERM3 ==0) %>%
+#   ggplot() +
+#   geom_histogram(aes(EST_NUM_PERM3))+
+#   xlab("Log CPUE") +
+#   ylab("Count") 
+# 
+# df_nozero %>%
+#   ggplot() +
+#   geom_histogram(aes(log(sum))) + 
+#   xlab("Log CPUE") +
+#   ylab("Count") 
   #labs(caption = "Figure  4. Log-transformed CPUE for the complete  *Calanus marshallae* dataset")
 ```
 
@@ -409,8 +470,7 @@ Where $b_{0s}$ is the random effect of year (note I am interested in looking at 
 ```{r set up df_model}
 df_model <- df_summary %>% #create factors for year and domain
   mutate(YEAR = as.factor(YEAR), 
-         DOMAIN = as.factor(DOMAIN),
-         summer.cold.pool.extent = as.factor(summer.cold.pool.extent)) 
+         DOMAIN = as.factor(DOMAIN))
  
 # convert lat long to distances
 # x <- mapproject(df_model$LON, df_model$LAT, "albers", param=c(55.9, 60.8))
@@ -418,214 +478,21 @@ df_model <- df_summary %>% #create factors for year and domain
 # df_model$y <- x$y
 ```
 
-```{r CALANUS MODEL TESTING}
-df_calanus <- df_model %>%
-  filter(TAXON_NAME == "Calanus spp")%>%
-  filter(!TEMPERATURE < 0)
-#  
-# m1 <- gam(sum ~  s(TEMPERATURE, k=4), 
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))  
-# 
-# m2 <- gam(sum ~ YEAR + s(TEMPERATURE, k=7),
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-# 
-# m3 <- gam(sum ~   s(LON, LAT, bs='gp',m=2), 
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-# 
-# m4 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + s(LON, LAT, bs='gp',m=2), 
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-
-# m5 <- gam(sum ~ YEAR + s(TEMPERATURE, k=7) + te(LON, LAT,  by = YEAR),
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-# summary(m5)
-# 
-# m6 <- gam(sum ~ YEAR +  s(TEMPERATURE, k=7)+ te(LON, LAT,  by = YEAR, k=12),
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-# 
-# summary(m6)
-
-# #histogram(df_calanus$ TEMPERATURE)
-
-# summary(temp)
-# plot(temp)
-# te tensor product, spatial smoother. specify df in lat and long, build anisotropy  
-# m6 <- gam(sum ~ YEAR + s(TEMPERATURE, by = YEAR, k=7) + s(LON, LAT, bs='gp', m=2, by = YEAR), 
-#          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
-
-#AIC(m1, m2,m3,m4,m5) #including spatial component by year improves fit by a lot
-#AIC(m5, m6)
-
-```
-
-```{r calanus best model}
-### ESTIMATE BEST MODEL USING REML
-best <- gam(sum ~ YEAR + s(TEMPERATURE, k=7) + te(LON, LAT,  by = YEAR, k=12) , data = df_calanus, method = "REML", family = Tweedie(p=1.84))
-```
-
-```{r CALANUS WINNING MODEL GOODNESS OF FIT}
-summary(m5)
-#summary(m6)
-
-# Predict temperature by year --- i dont think i can do this with the spatial component..
-# new.df <- data.frame(expand_grid(YEAR = factor(c("2014", "2015", "2016")),
-#                      TEMPERATURE = seq(3,12, by=0.1),
-#                      LAT = seq(min(df_calanus$LAT), 
-#                                max(df_calanus$LAT), length = 25),
-#                      LON = seq(min(df_calanus$LON), 
-#                                max(df_calanus$LON), length = 25)))
-# 
-# new.df$pred <- predict(m5, newdata=new.df)
-# new.df %>%
-#   ggplot(aes(TEMPERATURE,pred, group = YEAR, color = YEAR)) +
-#   geom_line() +
-#   geom_point(data = df_model, aes(TEMPERATURE,log(sum), group = YEAR, color = YEAR), alpha = 0.2) 
-
-#residuals x year
-plot(df_calanus$YEAR, resid(m5)); abline(h=0, lty=2)
-plot(df_calanus$TEMPERATURE, resid(m5)); abline(h=0, lty=2)
-
-b<-getViz(m6) 
-#### check spatial residuals 
-ck1 <- check1D(b, "LON")
-ck2 <- check1D(b, "LAT")
-gridPrint(ck1, ck2, ncol = 2)
-gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
-          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
-
-##### nice looking goodness of fits with mgcvViz
-check(b,
-      a.qq = list(method = "tnorm", 
-                  a.cipoly = list(fill = "light blue")), 
-      a.respoi = list(size = 0.5), 
-      a.hist = list(bins = 10))
-
-temp <- plot(sm(b, 1) )
-
-temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
-    l_points(shape = 19, size = 1, alpha = 0.1) + 
-    theme_classic()   
-
-calanus_temp<-temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
-    l_points(shape = 19, size = 1, alpha = 0.1) + 
-    theme_classic()  +
-  ggtitle("Calanus")
-
-#visualize spatial uncertainty
-vis.gam(m5, view = c("LON", "LAT"), 
-        plot.type = "persp", se = 2)
-#rotate
-vis.gam(m5, view = c("LON", "LAT"), 
-        plot.type = "persp", se = 2, theta = 135)
-#plot map
-# Make plot with 5% extrapolation
-vis.gam(m5, view = c("LON", "LAT"), 
-        plot.type = "contour", too.far = 0.05)
-
-# Overlay data
-points(df_model$x,df_model$y)
-```
-
-```{r PSEUDOCALANUS MODEL TESTING}
-df_psuedocalanus <- df_model %>%
-  filter(TAXON_NAME == "Pseudocalanus spp.")
-
-ps1 <- gam(sum ~  s(TEMPERATURE, k=4), 
-         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))  
-
-ps2 <- gam(sum ~ YEAR + s(TEMPERATURE, k=7),
-         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
-
-ps3 <- gam(sum ~   s(LON, LAT, bs='gp',m=2), 
-         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
-
-# ps4 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + s(LON, LAT, bs='gp',m=2), 
-#          data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
-
-ps4 <- gam(sum ~ YEAR +  s(TEMPERATURE, k=4)+ te(LON, LAT,  by = YEAR, k=12), 
-         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
-
-# ps5 <- gam(sum ~ YEAR +  s(TEMPERATURE, k=7)+ te(LON, LAT,  by = YEAR, k=12), 
-#          data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
-
-AIC(ps1, ps2,ps3,ps4,ps5) #including spatial component by year improves fit by a lot
-
-### ESTIMATE BEST MODEL USING REML
-best_ps <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + te(LON, LAT,  by = YEAR, k=12), 
-         data = df_psuedocalanus, method = "REML", family = Tweedie(p=1.84))
-```
-
-```{r PSEUDOCALANUS WINNING MODEL GOODNESS OF FIT}
-# Predict temperature by year
-# new.df <- data.frame(expand_grid(YEAR = factor(c("2014", "2015", "2016")),
-#                      TEMPERATURE = seq(3,12, by=0.1)))
-# new.df$pred <- predict(ps5, newdata=new.df)
-# new.df %>%
-#   ggplot(aes(TEMPERATURE,pred, group = YEAR, color = YEAR)) +
-#   geom_line() +
-#   geom_point(data = df_model, aes(TEMPERATURE,log(sum), group = YEAR, color = YEAR), alpha = 0.2)
-#  
-
-#residuals x year
-plot(df_calanus$YEAR, resid(ps5)); abline(h=0, lty=2)
-plot(df_calanus$TEMPERATURE, resid(ps5)); abline(h=0, lty=2)
-
-p<-getViz(ps4)
-#### check residuals 
-ck1 <- check1D(p, "LON")
-ck2 <- check1D(p, "LAT")
-gridPrint(ck1, ck2, ncol = 2)
-gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
-          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
-
-##### nice looking goodness of fits with mgcvViz
-check(p,
-      a.qq = list(method = "tnorm", 
-                  a.cipoly = list(fill = "light blue")), 
-      a.respoi = list(size = 0.5), 
-      a.hist = list(bins = 10))
-
-temp <- plot( sm(p, 1) )
-
-temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
-    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
-pseudo_temp <- temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
-    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  +
-  ggtitle("Pseudocalanus")
-
-#visualize spatial uncertainty
-vis.gam(ps5, view = c("LON", "LAT"), 
-        plot.type = "persp", se = 2)
-#rotate
-vis.gam(ps5, view = c("LON", "LAT"), 
-        plot.type = "persp", se = 2, theta = 135)
-#plot map
-# Make plot with 5% extrapolation
-vis.gam(m5, view = c("LON", "LAT"), 
-        plot.type = "contour", too.far = 0.05)
-
-# Overlay data
-points(df_model$LON,df_model$LAT)
-```
-
 ```{r check spatial autocorr}
 # Examine residuals for autocorrelation. First, we can do a quick graphical 
 # exploration by plotting the residuals in space:
-spatial_df<-df_model
 #spatial component follow along with lab 12 document 
+spatial_df <- df_model
 # Estimate means of CPUE by year:
 mean_year <- gam(sum ~ YEAR, data=spatial_df, family = tw, method = "ML")
 summary(mean_year) #p=1.858
 mean_year$df.null
-
+ 
 # We should examine autocorrelation for one year at a time because the spatial 
 # autocorrelation, if present, should be evident within years only (because the 
 # fish may have a quite different spatial distributions between years):
 spatial_df$r <- resid(mean_year)   # Extract residuals
-coordinates(spatial_df) <- c("x","y")
+coordinates(spatial_df) <- c("LON","LAT")
 # Note that this creates a more complex object that includes the data frame as
 # a 'slot'. However, you can still use it like a data frame for most purposes.
 j <- spatial_df$YEAR == "2014"  # Extract 2010 data only
@@ -660,47 +527,261 @@ bins <- cut(SemiVar$dist, seq(0,0.1, by=0.005))
 plot(bins, SemiVar$variog) #looks like slight spatial autocorr, nothing too huge.
 ```
  
-```{r save plots to pdf for talk}
-pdf("homework/temperature_map.pdf")
+```{r CALANUS MODEL TESTING}
+df_calanus <- df_model %>%
+  filter(TAXON_NAME == "Calanus spp")%>%
+  #filter(!TEMPERATURE < 0) %>%
+  filter(!sum ==0)
+
+m1 <- gam(sum ~  s(julian,k=4),
+         data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+
+m2 <- gam(sum ~  s(TEMPERATURE, k=4),
+         data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+ 
+m3 <- gam(sum ~    s(TEMPERATURE, k=4)+te(x, y, k=c(8,5)),
+         data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+
+m4 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + te(x, y,k=c(8,5), by = YEAR),
+         data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+
+m5 <- gam(sum ~ YEAR + s(julian,k=4) + te(x, y,  by = YEAR,k=c(8,5)),
+         data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+
+m6 <- gam(sum ~ YEAR +  s(TEMPERATURE, k=4) + s(julian,k=4) + te(x, y,  by = YEAR, k=c(8,5)),
+          data = df_calanus, method = "ML", family = Tweedie(p=1.84))
+
+AIC(m1,m2,m3,m4,m5,m6)
+summary(m1)
+summary(m2)
+summary(m3)
+summary(m4)
+summary(m5)
+summary(m6)
+
+### ESTIMATE BEST MODEL USING REML
+best_calanus <- gam(sum ~ YEAR +  s(TEMPERATURE, k=5) + s(julian, k =3) + te(LON, LAT,  by = YEAR),
+          data = df_calanus, method = "REML", family = Tweedie(p=1.84))
+
+```
+
+```{r CALANUS BEST MODEL GOODNESS OF FIT}
+summary(best_calanus)
+
+#residuals x year
+plot(df_calanus$YEAR, resid(best_calanus)); abline(h=0, lty=2)
+plot(df_calanus$TEMPERATURE, resid(best_calanus)); abline(h=0, lty=2)
+plot(df_calanus$julian, resid(best_calanus)); abline(h=0, lty=2)
+
+b<-getViz(best_calanus) 
+#### check spatial residuals 
+ck1 <- check1D(b, "LON")
+ck2 <- check1D(b, "LAT")
+gridPrint(ck1, ck2, ncol = 2)
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+ 
+##### nice looking goodness of fits with mgcvViz
+check(b,
+      a.qq = list(method = "tnorm", 
+                  a.cipoly = list(fill = "light blue")), 
+      a.respoi = list(size = 0.5), 
+      a.hist = list(bins = 10))
+
+temp <- plot(sm(b, 1) )
+
+temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + 
+    theme_classic()   
+
+julian <- plot(sm(b, 2) )
+
+julian + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + 
+    theme_classic()   
+
+calanus_temp<-temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + 
+    theme_classic()  +
+  ggtitle("Calanus")
+
+#visualize spatial uncertainty
+vis.gam(best_calanus, view = c("LON", "LAT"), 
+        plot.type = "persp", se = 2)
+#rotate
+vis.gam(best_calanus, view = c("LON", "LAT"), 
+        plot.type = "persp", se = 2, theta = 135)
+#plot map
+# Make plot with 5% extrapolation
+vis.gam(best_calanus, view = c("LON", "LAT"), 
+        plot.type = "contour", too.far = 0.05)
+
+# Overlay data
+points(df_model$LON,df_model$LAT)
+```
+
+```{r PSEUDOCALANUS MODEL TESTING}
+df_psuedocalanus <- df_model %>%
+  filter(TAXON_NAME == "Pseudocalanus spp.") %>%
+  filter(!sum == 0)
+
+
+ps1 <- gam(sum ~  s(julian,k=4),
+         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+
+ps2 <- gam(sum ~  s(TEMPERATURE, k=4),
+         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+ 
+ps3 <- gam(sum ~    s(TEMPERATURE, k=4)+te(x, y, k=c(8,5)),
+         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+
+ps4 <- gam(sum ~ YEAR + s(TEMPERATURE, k=4) + te(x, y,k=c(8,5), by = YEAR),
+         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+
+ps5 <- gam(sum ~ YEAR + s(julian,k=4) + te(x, y,  by = YEAR,k=c(8,5)),
+         data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+
+ps6 <- gam(sum ~ YEAR +  s(TEMPERATURE, k=4) + s(julian,k=4) + te(x, y,  by = YEAR, k=c(8,5)),
+          data = df_psuedocalanus, method = "ML", family = Tweedie(p=1.84))
+  
+
+AIC(ps1,ps2,ps3,ps4,ps5,ps6)
+summary(ps1)
+summary(ps2)
+summary(ps3)
+summary(ps4)
+summary(ps5)
+summary(ps6)
+ 
+### ESTIMATE BEST MODEL USING REML
+best_ps <- gam(sum ~ YEAR +  s(TEMPERATURE, k=4) + s(julian,k=4) + te(LON, LAT,  by = YEAR, k=c(8,5)),data = df_psuedocalanus, method = "REML", family = Tweedie(p=1.84))
+  
+```
+
+```{r PSEUDOCALANUS BEST MODEL GOODNESS OF FIT}
+
+#residuals x year
+plot(df_psuedocalanus$YEAR, resid(ps5)); abline(h=0, lty=2)
+plot(df_psuedocalanus$TEMPERATURE, resid(ps5)); abline(h=0, lty=2)
+plot(df_psuedocalanus$julian, resid(ps5)); abline(h=0, lty=2)
+
+p<-getViz(best_ps)
+#### check residuals 
+ck1 <- check1D(p, "LON")
+ck2 <- check1D(p, "LAT")
+gridPrint(ck1, ck2, ncol = 2)
+gridPrint(ck1 + l_dens(type = "cond", alpha = 0.8) + l_rug(alpha = 0.2), 
+          ck2 + l_points() + l_rug(alpha = 0.2), layout_matrix = matrix(c(1, 1, 1, 2, 2), 1, 5)) #maybe over predicting in middle, high residuals. 
+
+##### nice looking goodness of fits with mgcvViz
+check(p,
+      a.qq = list(method = "tnorm", 
+                  a.cipoly = list(fill = "light blue")), 
+      a.respoi = list(size = 0.5), 
+      a.hist = list(bins = 10))
+
+temp <- plot( sm(p, 1) )
+
+temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+pseudo_temp <- temp + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  +
+  ggtitle("Pseudocalanus")
+
+julian_ps <- plot(sm(p, 2) )
+
+julian_ps + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  
+
+pseudo_julian <- julian_ps + l_fitLine(colour = "red") + #l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+    l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
+    l_points(shape = 19, size = 1, alpha = 0.1) + theme_classic()  +
+  ggtitle("Pseudocalanus") 
+ 
+#visualize spatial uncertainty
+vis.gam(ps5, view = c("LON", "LAT"), 
+        plot.type = "persp", se = 2)
+#rotate
+vis.gam(ps5, view = c("LON", "LAT"), 
+        plot.type = "persp", se = 2, theta = 135)
+#plot map
+# Make plot with 5% extrapolation
+vis.gam(m5, view = c("LON", "LAT"), 
+        plot.type = "contour", too.far = 0.05)
+
+# Overlay data
+points(df_model$LON,df_model$LAT)
+```
+
+```{r save data plots to pdf for talk}
+pdf("final_project_figures/temperature_map.pdf")
 temperature
 dev.off()
  
-#save temp plots
-pdf("homework/calanus_point_map.pdf")
-cal_point_map
+# #save temp plots
+# pdf("final_project_figures/calanus_point_map.pdf")
+# cal_point_map
+# dev.off()
+# 
+# pdf("final_project_figures/pseudocalanus_point_map.pdf")
+# ps_point_map
+# dev.off()
+# 
+#  
+point_both_sp<-ggarrange(cal_point_map,ps_point_map, labels = c("A", "B"))
+
+pdf("final_project_figures/both_sp_point_map.pdf")
+point_both_sp
 dev.off()
 
-pdf("homework/pseudocalanus_point_map.pdf")
-ps_point_map
-dev.off()
-
-
 #save temp plots
-pdf("homework/calanus_gam_temperature.pdf")
+pdf("final_project_figures/calanus_gam_temperature.pdf")
 calanus_temp
 dev.off()
 
-pdf("homework/pseudocalanus_gam_temperature.pdf")
+pdf("final_project_figures/pseudocalanus_gam_temperature.pdf")
 pseudo_temp
 dev.off()
 ```
  
-```{r temperature model and plot for smooth temperature}
-temp <- gam(TEMPERATURE ~ YEAR+ te(LON, LAT,  by = YEAR, k=12) ,  
-         data = df_calanus, method = "REML", family = Gamma(link = "log") )
+ 
+ 
+```{r early and late temperature model and plot for smooth temperature}
+df_temperature_model<-df_summary %>% filter(!TEMPERATURE <0.01) %>%
+  mutate(YEAR = as.factor(YEAR)) %>% 
+  filter(case_when(YEAR == 2018 ~ LAT < 63,
+                   TRUE ~TRUE ))
 
+temp <- gam(TEMPERATURE ~ YEAR+ te(LON, LAT,  by = YEAR, k=c(8,5)) + s(julian, k =3) ,  
+         data = df_temperature_model, method = "REML", family = Gamma(link = "log") )
+ 
 #first need to generate smooth temperature to predict Calanus on. do that based on temp model. 
-new_temp <- expand_grid(YEAR = c("2014", "2015", "2016", "2018"),
-                        LAT = seq(min(df_calanus$LAT), max(df_calanus$LAT), length=100 ),
-                        LON = seq(min(df_calanus$LON), max(df_calanus$LON), length =100 ))
-new_temp$temp<-predict(temp,new_temp) 
+new_temp_early <- expand_grid(YEAR = c("2014", "2015", "2016", "2018"),
+                        julian = 150, 
+                        LAT = seq(min(df_temperature_model$LAT), max(df_temperature_model$LAT), length=100),
+                        LON = seq(min(df_temperature_model$LON), max(df_temperature_model$LON), length =100 ))
+new_temp_early$temp<-predict(temp,new_temp_early) 
+
+
+new_temp_late <- expand_grid(YEAR = c("2014", "2015", "2016", "2018"),
+                        julian = 250, 
+                        LAT = seq(min(df_temperature_model$LAT), max(df_temperature_model$LAT), length=100),
+                       LON = seq(min(df_temperature_model$LON), max(df_temperature_model$LON), length =100 ))
+new_temp_late$temp<-predict(temp,new_temp_late) 
 
 #filter temperature script appropriately to remove extrapolation
 #have to do this by year... 
-temperature_filter_by_year<-function(year){
-points <- df_calanus %>% 
+temperature_filter_by_year<-function(year,temp_df){
+points <- df_temperature_model %>% 
   filter(YEAR == year) %>%
-  st_as_sf(coords = c("LON","LAT"), crs=4326)
+  st_as_sf(coords = c("LON","LAT"))#, crs=4326)
 
 polygon <- st_union(points) %>%  # unite the points to 1 object
   st_convex_hull() %>% # calculate the convex hull
@@ -711,33 +792,41 @@ polygon <- st_union(points) %>%  # unite the points to 1 object
 #   geom_sf(data = points, col = "red", size = 2, pch = 4) +
 #   geom_sf(data = polygon, col = "grey45", fill = NA)
 
-temperature_sf<-st_as_sf(new_temp %>% filter(YEAR == year),
-                         coords = c("LON","LAT"), crs=4326)
+temperature_sf<-st_as_sf(temp_df %>% filter(YEAR == year),
+                         coords = c("LON","LAT"))
 
 temperature_df <-st_intersection(temperature_sf, polygon) %>%
   data.frame() %>%
-  separate(geometry, into =c(  "LON","LAT" ), sep = "," )%>%
+  separate(geometry, into =c( "LON","LAT" ), sep = "," ) %>%
   mutate(LON = as.numeric(str_sub(LON, 3)),
          LAT = as.numeric(str_sub(LAT, 1,-2)))
 return(temperature_df)
 }
 
 #run function for each year and bind together
-temp_2014<-temperature_filter_by_year(year = "2014")
-temp_2015<-temperature_filter_by_year(year = "2015")
-temp_2016<-temperature_filter_by_year(year = "2016")
-temp_2018<-temperature_filter_by_year(year = "2018")
+temp_2014<-temperature_filter_by_year(year = "2014", temp_df = new_temp_early)
+temp_2015<-temperature_filter_by_year(year = "2015", temp_df = new_temp_early)
+temp_2016<-temperature_filter_by_year(year = "2016", temp_df = new_temp_early)
+temp_2018<-temperature_filter_by_year(year = "2018", temp_df = new_temp_early)
 
-temperature_df_filtered<-rbind(temp_2014,temp_2015,temp_2016,temp_2018) %>%
+temperature_df_filtered_early<-rbind(temp_2014,temp_2015,temp_2016,temp_2018) %>%
   filter(!temp >log(12))
 
+temp_2014<-temperature_filter_by_year(year = "2014", temp_df = new_temp_late)
+temp_2015<-temperature_filter_by_year(year = "2015", temp_df = new_temp_late)
+temp_2016<-temperature_filter_by_year(year = "2016", temp_df = new_temp_late)
+temp_2018<-temperature_filter_by_year(year = "2018", temp_df = new_temp_late)
+
+temperature_df_filtered_late<-rbind(temp_2014,temp_2015,temp_2016,temp_2018) %>%
+  filter(!temp >log(12))
+ 
 #https://stackoverflow.com/questions/57474365/how-to-draw-polygon-for-lots-of-lat-long-coordinates-and-calculate-surface-are
 
 ggplot(ak) +
-   geom_contour_filled(data= temperature_df_filtered,
+   geom_contour_filled(data= temperature_df_filtered_early,
         aes(LON, LAT, z= exp(temp))) +
   geom_sf( fill= "white") +
-  #geom_point(data = df_model, aes(x=LON, y=LAT)) +
+  #geom_point(data = df_temperature_model, aes(x=LON, y=LAT)) +
   facet_wrap(~YEAR ) +
       scale_fill_viridis_d(name="temp") +
       theme( strip.text = element_text(size =12),
@@ -754,12 +843,13 @@ ggplot(ak) +
         axis.ticks.x=element_blank())
 ```
 
-```{r Plot best models on a map CALANUS}
+```{r Plot best models on a map CALANUS, early}
 #### take df from temperature smooth and predict Calanus abundance. 
-cal_predict <- temperature_df_filtered %>% 
+cal_predict <- temperature_df_filtered_early %>% 
+  mutate(julian = 150) %>%
   dplyr::rename(TEMPERATURE = temp)
 
-pred <- predict(best, cal_predict, se.fit=TRUE)
+pred <- predict(best_calanus, cal_predict, se.fit=TRUE)
 
 cal_predict <- cbind(cal_predict, data.frame(pred[1]), data.frame(pred[2])) 
 
@@ -768,11 +858,11 @@ cal_predict <- cbind(cal_predict, data.frame(pred[1]), data.frame(pred[2]))
    filter(!se.fit>1.5) # DO A BETTER JOB AT FILTERING THESE FOR WHERE THERE IS LITTLE DATA, IE 2016 AND NORTHERN PORTION OF 2017
  
 calanus_pred<-ggplot(ak) +
-   geom_contour_filled(data= cal,
+   geom_contour_filled(data= cal_predict,
         aes(LON, LAT, z= fit)) + 
   geom_sf( fill= "white") +
-#  geom_sf(data = ortiz_shp, fill = NA) + 
- # geom_point(data = df_model, aes(x=LON, y=LAT)) + 
+# geom_sf(data = ortiz_shp, fill = NA) + 
+  #geom_point(data = df_model, aes(x=LON, y=LAT)) + 
   facet_wrap(~YEAR) + 
       scale_fill_viridis_d(name="Calanus log(CPUE)") +
       theme( strip.text = element_text(size =12),
@@ -790,9 +880,47 @@ calanus_pred<-ggplot(ak) +
 
 calanus_pred
 ```
+
+```{r Plot best models on a map CALANUS, late}
+#### take df from temperature smooth and predict Calanus abundance. 
+cal_predict <- temperature_df_filtered_late %>% 
+  mutate(julian = 250) %>%
+  dplyr::rename(TEMPERATURE = temp)
+
+pred <- predict(best_calanus, cal_predict, se.fit=TRUE)
+
+cal_predict <- cbind(cal_predict, data.frame(pred[1]), data.frame(pred[2])) 
+
+#filter out areas where it is clearly extrapolating. 
+ cal<-cal_predict %>%
+   filter(!se.fit>1.5) # DO A BETTER JOB AT FILTERING THESE FOR WHERE THERE IS LITTLE DATA, IE 2016 AND NORTHERN PORTION OF 2017
  
-```{r Plot best models on a map PSUEDOCALANUS}
-PScal_predict <- temperature_df_filtered %>% 
+calanus_pred_late<-ggplot( ak) +
+   geom_contour_filled(data= cal,
+        aes(LON, LAT, z= fit)) + 
+  geom_sf( fill= "white") +
+ #geom_point(data = df_model, aes(x=LON, y=LAT)) + 
+  facet_wrap(~YEAR) + 
+      scale_fill_viridis_d(name="Calanus log(CPUE), Julian day = 250  ") +
+      theme( strip.text = element_text(size =12),
+        legend.key.size = unit(0.5, 'cm'),
+        legend.position = "bottom", 
+        legend.text=element_text(size=7),
+        legend.title = element_text(size=7),
+        plot.caption = element_text(hjust = 0, size =10),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())  
+
+calanus_pred_late
+```
+
+```{r Plot best models on a map PSUEDOCALANUS, early}
+PScal_predict <- temperature_df_filtered_early %>% 
+    mutate(julian = 150) %>%
   dplyr::rename(TEMPERATURE = temp)
 
 PScal_pred <- predict(best_ps, PScal_predict, se.fit=TRUE)
@@ -803,7 +931,44 @@ PScal_predict <- cbind(PScal_predict, data.frame(PScal_pred[1]), data.frame(PSca
 PScal<-PScal_predict %>%
   filter(!se.fit>1.5)#!est>8.5)
 
-ps_map<-ggplot(ak) +
+ps_map_early<-ggplot(ak) +
+   geom_contour_filled(data= PScal,
+        aes(LON, LAT, z= fit)) + 
+  geom_sf( fill= "white") + 
+  # geom_sf(data = ortiz_shp, fill= NA) + 
+  facet_wrap(~YEAR) + 
+      scale_fill_viridis_d(name="Pseudocalanus log(CPUE), Early") +
+      theme( strip.text = element_text(size =12),
+        legend.key.size = unit(0.5, 'cm'),
+        legend.position = "bottom", 
+        legend.text=element_text(size=7),
+        legend.title = element_text(size=7),
+        plot.caption = element_text(hjust = 0, size =10),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())  
+
+ps_map_early
+
+```
+
+```{r Plot best models on a map PSUEDOCALANUS, late}
+PScal_predict <- temperature_df_filtered_late %>% 
+    mutate(julian = 250) %>%
+  dplyr::rename(TEMPERATURE = temp)
+
+PScal_pred <- predict(best_ps, PScal_predict, se.fit=TRUE)
+
+PScal_predict <- cbind(PScal_predict, data.frame(PScal_pred[1]), data.frame(PScal_pred[2])) 
+
+#filter out areas where it is clearly extrapolating. 
+PScal<-PScal_predict %>%
+  filter(!se.fit>1.5)#!est>8.5)
+
+ps_map_late<-ggplot(ak) +
    geom_contour_filled(data= PScal,
         aes(LON, LAT, z= fit)) + 
   geom_sf( fill= "white") + 
@@ -823,54 +988,81 @@ ps_map<-ggplot(ak) +
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())  
 
-ps_map
-
- 
- 
-# ef_ps = evaluate_smooth(ps5, smooth= "s(LON,LAT)" )
-# 
-# #filter our regions where extrapolation is occuring... 
-# # ef_ps_filter<-  ef_ps %>% filter(case_when(
-# #     YEAR %in% c("2016" )  ~ LAT < 60.9099, # dont plot higher than 60.9099
-# #      TRUE ~ TRUE))
-#  
-# ef_ps_filter<-  semi_join(ef_ps, ef_cal_filter, by = c("LAT", "LON", "YEAR")) %>%
-#   mutate(est = exp(est))#better SE's for pseudocalanus, so just filtered based on lat and lon in calanus. 
-# 
-# ggplot(ak) +
-#    geom_contour_filled(data= ef_ps_filter, #%>%
-#           #mutate(lon=round(lon, 2), lat=round(lat, 2)),
-#         aes(LON, LAT, z= est) 
-#       ) + 
-#   geom_sf( fill= "white") +
-#   #geom_sf(data = ortiz_shp, fill = NA, alpha = 0.5)+
-#  # geom_point(data = df_model, aes(x=LON, y=LAT)) + 
-#   facet_wrap(~YEAR) + 
-#       scale_fill_viridis_d(name="CPUE") +
-#        theme( strip.text = element_text(size =12),
-#         legend.key.size = unit(0.5, 'cm'),
-#         legend.position = "bottom", 
-#         legend.text=element_text(size=7),
-#         legend.title = element_text(size=7),
-#         plot.caption = element_text(hjust = 0, size =10),
-#         axis.title.y=element_blank(),
-#         axis.text.y=element_blank(),
-#         axis.ticks.y=element_blank(),
-#         axis.title.x=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.ticks.x=element_blank()) 
+ps_map_late
 
 ```
 
+```{r PLOT COEFFICIENTS}
+
+cal_summary<-summary(best_calanus)
+cal_output<-data.frame(coeff=cal_summary$p.coeff)
+cal_output$se<- cal_summary$se[1:4]
+cal_output$species <- "Calanus"
+
+ps_summary<- summary(best_ps)
+ps_output<-data.frame(coeff=ps_summary$p.coeff)
+ps_output$se<- ps_summary$se[1:4]
+ps_output$species <- "Pseudocalanus"
+
+coeffdf<-rbind(ps_output, cal_output) 
+
+ year_estimates_df <- coeffdf %>%
+   rownames_to_column() %>% 
+  dplyr::select(-se) %>%
+  spread(rowname, coeff) %>%
+  transmute(Calanus.year2014 = `(Intercept)`,
+            Calanus.year2015 = `(Intercept)`+YEAR2015,
+            Calanus.year2016 = `(Intercept)`+YEAR2016,
+            Calanus.year2018 = `(Intercept)`+YEAR2018,
+            
+            Pseudo.year2014 = `(Intercept)1`,
+            Pseudo.year2015 = `(Intercept)1`+YEAR20151,
+            Pseudo.year2016 = `(Intercept)1`+YEAR20161,
+            Pseudo.year2018 = `(Intercept)1`+YEAR20181) %>%
+   gather(1:ncol(.), key = "year", value = "log_estimate") %>%
+   filter(!is.na(log_estimate)) %>%
+   cbind(coeffdf %>% dplyr::select(-coeff)) %>%
+   separate(year, into = c("delete", "year"))
+library(PNWColors)
+ 
+year_CPUE<-ggplot(year_estimates_df, aes(x=year, y = log_estimate, group = species, fill = year)) +
+  geom_bar(stat = 'identity', color = "black"  ) +
+  geom_errorbar(aes(ymin = log_estimate - se, ymax = log_estimate + se), width = 0.2) +
+  facet_wrap(~species) + 
+  scale_fill_manual(values = pnw_palette("Bay", n=4, "continuous")) +
+  guides(fill = "none")+
+  theme(axis.text.x =  element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab( " ") +
+   ylab("Log Estimate Mean CPUE")
+year_CPUE
+
+pdf("final_project_figures/year_cpue.pdf")
+year_CPUE
+dev.off()
+```
+
+
 ```{r save pretty maps}
-pdf("homework/PS_map.pdf")
-ps_map
+pdf("final_project_figures/PS_map.pdf")
+ggarrange(ps_map_early,ps_map_late, labels = c("A", "B"))
 dev.off()
 
-#save plot
-pdf("homework/Calanus_map.pdf")
-calanus_pred
+pdf("final_project_figures/CAL_map.pdf")
+ggarrange(calanus_pred,calanus_pred_late, labels = c("A", "B"))
 dev.off()
+
+# pdf("final_project_figures/PS_map_late.pdf")
+# ps_map_late
+# dev.off()
+# 
+# #save plot
+# pdf("final_project_figures/Calanus_map_early.pdf")
+# calanus_pred_early
+# dev.off()
+# 
+# pdf("final_project_figures/Calanus_map_late.pdf")
+# calanus_pred_late
+# dev.off()
 ```
 
 ## Acknowledgements
