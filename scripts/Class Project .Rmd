@@ -741,16 +741,7 @@ pdf("final_project_figures/both_sp_point_map.pdf")
 point_both_sp
 dev.off()
 
-#save temp plots
-pdf("final_project_figures/calanus_gam_temperature.pdf")
-calanus_temp
-dev.off()
-
-pdf("final_project_figures/pseudocalanus_gam_temperature.pdf")
-pseudo_temp
-dev.off()
 ```
- 
  
  
 ```{r early and late temperature model and plot for smooth temperature}
@@ -854,7 +845,7 @@ pred <- predict(best_calanus, cal_predict, se.fit=TRUE)
 cal_predict <- cbind(cal_predict, data.frame(pred[1]), data.frame(pred[2])) 
 
 #filter out areas where it is clearly extrapolating. 
- cal<-cal_predict %>%
+ cal_early<-cal_predict %>%
    filter(!se.fit>1.5) # DO A BETTER JOB AT FILTERING THESE FOR WHERE THERE IS LITTLE DATA, IE 2016 AND NORTHERN PORTION OF 2017
  
 calanus_pred<-ggplot(ak) +
@@ -893,15 +884,16 @@ cal_predict <- cbind(cal_predict, data.frame(pred[1]), data.frame(pred[2]))
 
 #filter out areas where it is clearly extrapolating. 
  cal<-cal_predict %>%
-   filter(!se.fit>1.5) # DO A BETTER JOB AT FILTERING THESE FOR WHERE THERE IS LITTLE DATA, IE 2016 AND NORTHERN PORTION OF 2017
+   filter(!se.fit>1.5) %>%
+   rbind(cal_early) # DO A BETTER JOB AT FILTERING THESE FOR WHERE THERE IS LITTLE DATA, IE 2016 AND NORTHERN PORTION OF 2017
  
 calanus_pred_late<-ggplot( ak) +
    geom_contour_filled(data= cal,
         aes(LON, LAT, z= fit)) + 
   geom_sf( fill= "white") +
  #geom_point(data = df_model, aes(x=LON, y=LAT)) + 
-  facet_wrap(~YEAR) + 
-      scale_fill_viridis_d(name="Calanus log(CPUE), Julian day = 250  ") +
+  facet_grid(julian~YEAR) + 
+      scale_fill_viridis_d(name="Calanus log(CPUE)") +
       theme( strip.text = element_text(size =12),
         legend.key.size = unit(0.5, 'cm'),
         legend.position = "bottom", 
@@ -928,7 +920,7 @@ PScal_pred <- predict(best_ps, PScal_predict, se.fit=TRUE)
 PScal_predict <- cbind(PScal_predict, data.frame(PScal_pred[1]), data.frame(PScal_pred[2])) 
 
 #filter out areas where it is clearly extrapolating. 
-PScal<-PScal_predict %>%
+PScal_early<-PScal_predict %>%
   filter(!se.fit>1.5)#!est>8.5)
 
 ps_map_early<-ggplot(ak) +
@@ -966,16 +958,17 @@ PScal_predict <- cbind(PScal_predict, data.frame(PScal_pred[1]), data.frame(PSca
 
 #filter out areas where it is clearly extrapolating. 
 PScal<-PScal_predict %>%
-  filter(!se.fit>1.5)#!est>8.5)
+  filter(!se.fit>1.5) %>% #!est>8.5)
+  rbind(PScal_early)
 
 ps_map_late<-ggplot(ak) +
    geom_contour_filled(data= PScal,
         aes(LON, LAT, z= fit)) + 
   geom_sf( fill= "white") + 
   # geom_sf(data = ortiz_shp, fill= NA) + 
-  facet_wrap(~YEAR) + 
+  facet_grid(julian~YEAR) + 
       scale_fill_viridis_d(name="Pseudocalanus log(CPUE)") +
-      theme( strip.text = element_text(size =12),
+      theme(strip.text = element_text(size =12),
         legend.key.size = unit(0.5, 'cm'),
         legend.position = "bottom", 
         legend.text=element_text(size=7),
@@ -989,10 +982,9 @@ ps_map_late<-ggplot(ak) +
         axis.ticks.x=element_blank())  
 
 ps_map_late
-
 ```
 
-```{r PLOT COEFFICIENTS}
+```{r PLOT YEAR COEFFICIENTS}
 
 cal_summary<-summary(best_calanus)
 cal_output<-data.frame(coeff=cal_summary$p.coeff)
@@ -1041,15 +1033,101 @@ year_CPUE
 dev.off()
 ```
 
+```{r PLOT JULIAN DAY COEFFICIENTS}
+julian_predict <- expand_grid(YEAR = c("2016"),
+                        julian = seq(min(df_model$julian), max(df_model$julian)), 
+                        TEMPERATURE = 6,
+                        #LAT = seq(min(df_model$LAT), max(df_temperature_model$LAT), length=20),
+                        #LON = seq(min(df_model$LON), max(df_temperature_model$LON), length =20))
+                         LAT = 61.2465,
+                         LON = -173.7395)
+ 
+output<- predict(best_calanus,julian_predict, se.fit = TRUE) 
+ 
+output_df<-do.call(cbind.data.frame, output)
+ 
+julian_predict_df <- cbind(julian_predict,output_df) %>%
+  filter(julian < 170 |
+         julian > 230 ) %>%
+  mutate(group = case_when(julian <170 ~ "1",
+                           julian > 230 ~ "2"))
+
+#julian_calanus<-df_calanus %>% 
+ # filter(YEAR == "2016")#,
+         # LAT == 61.2465,
+         # LON == -173.7395)
+ 
+julian_calanus<-ggplot(julian_predict_df, aes(x=julian, y = fit)) +
+  geom_line(aes(group = group), color = "blue", linetype = "dotted") +
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit + se.fit, group = group), alpha = 0.2) +
+ # geom_point(data = julian_calanus, aes(x=julian, y = log(sum)), alpha = 0.5) +
+  ylab("Log Estimated CPUE") + 
+  xlab("Julian Day") + 
+  ggtitle("Calanus")
+
+########################################################
+#######################################################
+#Do it for Pseudocalanus
+
+output<- predict(best_ps ,julian_predict, se.fit = TRUE) 
+ 
+output_df<-do.call(cbind.data.frame, output)
+ 
+julian_predict_df_ps <- cbind(julian_predict,output_df) %>%
+  filter(julian < 165 |
+         julian > 230) %>%
+  filter(!julian < 125) %>%
+  mutate(group = case_when(julian <170 ~ "1",
+                           julian > 230 ~ "2"))
+
+julian_ps<-df_psuedocalanus %>% 
+  filter(YEAR == "2016")  
+ 
+julian_psuedocalanus<-ggplot(julian_predict_df_ps, aes(x=julian, y = fit)) +
+   # geom_point(data = julian_ps, aes(x=julian, y = log(sum)), alpha = 0.8,shape = 1, color = "darkblue" ) +
+  #scale_shape(solid = FALSE) +
+  geom_line(aes(group = group), color = "blue", linetype = "dotted") +
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit + se.fit, group = group), alpha = 0.2) +
+  ylab("Log Estimated CPUE") + 
+  xlab("Julian Day") + 
+  ggtitle("Pseudocalanus")
+julian_psuedocalanus
+
+# julian_day_zoop<-ggarrange(julian_calanus, julian_psuedocalanus, labels = c("A", "B"))
+# 
+# pdf("final_project_figures/julian.pdf")
+# julian_day_zoop
+# dev.off()
+
+
+#save temp plots
+pdf("final_project_figures/calanus_temp.pdf")
+calanus_temp
+dev.off()
+
+pdf("final_project_figures/pseudocalanus_temp.pdf")
+pseudo_temp
+dev.off()
+
+pdf("final_project_figures/calanus_julian.pdf")
+julian_calanus 
+dev.off()
+
+pdf("final_project_figures/pseudocalanus_julian.pdf")
+julian_psuedocalanus 
+dev.off()
+
+```
+
 
 ```{r save pretty maps}
-pdf("final_project_figures/PS_map.pdf")
-ggarrange(ps_map_early,ps_map_late, labels = c("A", "B"))
+pdf("final_project_figures/model_pred_map.pdf")
+ggarrange(calanus_pred_late,ps_map_late, labels = c("A", "B"), nrow =2)
 dev.off()
 
-pdf("final_project_figures/CAL_map.pdf")
-ggarrange(calanus_pred,calanus_pred_late, labels = c("A", "B"))
-dev.off()
+# pdf("final_project_figures/CAL_map.pdf")
+# ggarrange(calanus_pred,calanus_pred_late, labels = c("A", "B"))
+# dev.off()
 
 # pdf("final_project_figures/PS_map_late.pdf")
 # ps_map_late
